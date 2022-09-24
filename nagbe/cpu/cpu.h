@@ -1,6 +1,18 @@
 #pragma once
 #include <stdint.h>
 
+typedef enum flags
+{
+    // Zero flag
+    z = 16,
+    // Half-carry flag
+    h = 32,
+    // Subtraction flag
+    n = 64,
+    // Carry flag
+    c = 128
+} flags_t;
+
 typedef struct registers
 {
     union
@@ -8,7 +20,8 @@ typedef struct registers
         struct
         {
             // assumes litte endian
-            uint8_t f, a;
+            flags_t f;
+            uint8_t a;
         };
         uint16_t af;
     };
@@ -47,17 +60,8 @@ typedef struct registers
     uint16_t PC;
 } registers_t;
 
-typedef enum flags
-{
-    // Zero flag
-    z = 16,
-    // Half-carry flag
-    h = 32,
-    // Subtraction flag
-    n = 64,
-    // Carry flag
-    c = 128
-} flags_t;
-
 registers_t registers;
-flags_t flags;
+
+#define FLAGS_SET(x) (registers.f |= (x))
+#define FLAGS_TEST(x) (registers.f & (x))
+#define FLAGS_CLEAR(x) (registers.f &= ~(x))

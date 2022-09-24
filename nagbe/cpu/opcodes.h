@@ -1,19 +1,55 @@
 #pragma once
 
 /**
- * Opcodes taken from GBCPUman.pdf
+ * Opcodes taken from https://github.com/izik1/gbops
+ * i8: 8-bit signed data (direct)
+ * u8: 8-bit unsigned data (direct)
+ * u16: 16-bit unsigned data (direct)
+ * a16: 16-bit address (always indirect)
+ * *i: indirect access (pointer)
  */
 
-/* 8-bit load instructions */
-// LD register, value (8-bit)
-#define OP_LD_B 0x06
-#define OP_LD_C 0x0E
-#define OP_LD_D 0x16
-#define OP_LD_E 0x1E
+/* 8-bit instructions */
+// 00
+#define OP_NOP          0x00
+#define OP_LD_BC_u16    0x01
+#define OP_LD_BCi_A     0x02
+#define OP_INC_BC       0x03
+#define OP_INC_B        0x04
+#define OP_DEC_B        0x05
+#define OP_LD_B_u8      0x06
+#define OP_RLCA         0x07
+#define OP_LD_a16i_SP   0x08
+#define OP_ADD_HL_BC    0x09
+#define OP_LD_A_BCi     0x0A
+#define OP_DEC_BC       0x0B
+#define OP_INC_C        0x0C
+#define OP_DEC_C        0x0D
+#define OP_LD_C_u8      0x0E
+#define OP_RRCA         0x0F
+
+// 10
+#define OP_STOP         0x10
+#define OP_LD_DE_u18    0x11
+#define OP_LD_DEi_A     0x12
+#define OP_INC_DE       0x13
+#define OP_INC_D        0x14
+#define OP_DEC_D        0x15
+#define OP_LD_D_u8      0x16
+#define OP_RLA          0x17
+#define OP_JR_i8        0x18
+#define OP_ADD_HL_DE    0x19
+#define OP_LD_A_DEi     0x1A
+#define OP_DEC_DE       0x1B
+#define OP_INC_E        0x1C
+#define OP_DEC_E        0x1D
+#define OP_LD_E_u8      0x1E
+#define OP_RRA          0x1E
+
+// 20
 #define OP_LD_H 0x26
 #define OP_LD_L 0x2E
 
-// LD register 1, register 2
 #define OP_LD_A_A       0x7F
 #define OP_LD_A_B       0x78
 #define OP_LD_A_C       0x79
