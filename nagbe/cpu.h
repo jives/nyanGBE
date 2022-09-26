@@ -1,63 +1,40 @@
 #pragma once
-#include <stdint.h>
 
-typedef enum flags
+#include <stdint.h>
+#include "gb.h"
+
+typedef enum __attribute__((packed)) flags
 {
-    // Zero flag
-    z = 16,
-    // Half-carry flag
-    h = 32,
-    // Subtraction flag
-    n = 64,
-    // Carry flag
-    c = 128
+    z = 1 << 4, // Zero flag
+    h = 1 << 5, // Half-carry flag
+    n = 1 << 6, // Subtraction flag
+    c = 1 << 7  // Carry flag
 } flags_t;
 
-typedef struct registers
+typedef union registers
 {
-    union
+    uint16_t registers[GB_NUM_REG_16_BIT];
+    struct
     {
-        struct
-        {
-            // assumes litte endian
-            flags_t f;
-            uint8_t a;
-        };
         uint16_t af;
-    };
-
-    union
-    {
-        struct
-        {
-            // assumes litte endian
-            uint8_t c, b;
-        };
         uint16_t bc;
-    };
-
-    union
-    {
-        struct
-        {
-            // assumes litte endian
-            uint8_t e, d;
-        };
         uint16_t de;
+        uint16_t hl;
+        uint16_t sp;
+        uint16_t pc;
+    };
+    struct
+    {
+        flags_t f;
+        uint8_t a;
+        uint8_t c;
+        uint8_t b;
+        uint8_t e;
+        uint8_t d;
+        uint8_t l;
+        uint8_t h;
     };
     
-    union
-    {
-        struct
-        {
-            // assumes litte endian
-            uint8_t l, h;
-        };
-        uint16_t hl;
-    };
-
-    uint16_t SP;
-    uint16_t PC;
 } registers_t;
 
 registers_t registers;

@@ -1,6 +1,8 @@
-#include "cpu.h"
 #include <stdint.h>
 #include <stdio.h>
+
+#include "cpu.h"
+#include "opcodes.h"
 
 // void execute_opcode(uint8_t opcode)
 // {
@@ -27,14 +29,13 @@
 
 int main(int argc, char *argv[])
 {
-    printf("%d\n", flags);
-    flags |= z;
-    printf("%d\n", flags);
-
+    printf("size flags: %d\n bytes", sizeof(registers.f));
     registers.a = 0x02;
     registers.f = 0x01;
     printf("%x, %x\n", registers.a, registers.f);
     registers.af = 0xABCD;
+    printf("%x, %x\n", registers.a, registers.f);
+    FLAGS_CLEAR(c);
     printf("%x, %x\n", registers.a, registers.f);
     return 0;
 }
