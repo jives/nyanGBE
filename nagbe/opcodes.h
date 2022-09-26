@@ -3,13 +3,14 @@
 
 /**
  * Opcodes taken from https://github.com/izik1/gbops
- * i8: 8-bit signed data (direct)
- * u8: 8-bit unsigned data (direct)
- * u16: 16-bit unsigned data (direct)
+ * Naming convention:
+ * i8: 8-bit signed data (immediate)
+ * u8: 8-bit unsigned data (immediate)
+ * u16: 16-bit unsigned data (immediate)
  * a16: 16-bit address (always indirect)
- * i: indirect access (pointer)
- * p: increment register
- * m: decrement register
+ * ..i: indirect access (pointer [..])
+ * ..p: increment register [..+]
+ * ..m: decrement register [..-]
  */
 
 /**
@@ -268,9 +269,9 @@
 #define OP_RST_18h      0xDF
 
 // 0xEx
-#define OP_LD_FF_u8i_A  0xE0
+#define OP_LDH_u16i_A   0xE0
 #define OP_POP_HL       0xE1
-#define OP_LD_FF_Ci_A   0xE2
+#define OP_LDH_Ci_A     0xE2
 //#define OP_UNDEFINED  0xE3
 //#define OP_UNDEFINED  0xE4
 #define OP_PUSH_HL      0xE5
@@ -286,9 +287,9 @@
 #define OP_RST_28h      0xEF
 
 // 0xFx
-#define OP_LD_A_FF_u8i  0xF0
+#define OP_LDH_A_u16i   0xF0
 #define OP_POP_AF       0xF1
-#define OP_LD_A_FF_Ci   0xF2
+#define OP_LDH_A_Ci     0xF2
 #define OP_DI           0xF3
 //#define OP_UNDEFINED  0xF4
 #define OP_PUSH_AF      0xF5

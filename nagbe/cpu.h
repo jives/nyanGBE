@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "gb.h"
 
+/* Flags */
 typedef enum __attribute__((packed)) flags
 {
     z = 1 << 4, // Zero flag
@@ -11,6 +12,11 @@ typedef enum __attribute__((packed)) flags
     c = 1 << 7  // Carry flag
 } flags_t;
 
+#define FLAGS_SET(x) (registers.f |= (x))
+#define FLAGS_TEST(x) (registers.f & (x))
+#define FLAGS_CLEAR(x) (registers.f &= ~(x))
+
+/* Registers */
 typedef union registers
 {
     uint16_t registers[GB_NUM_REG_16_BIT];
@@ -39,6 +45,23 @@ typedef union registers
 
 registers_t registers;
 
-#define FLAGS_SET(x) (registers.f |= (x))
-#define FLAGS_TEST(x) (registers.f & (x))
-#define FLAGS_CLEAR(x) (registers.f &= ~(x))
+
+
+/** Instructions (see https://rgbds.gbdev.io/docs)
+ * Naming convention:
+ * r8/16: 8/16-bit register
+ * lr: low 8-bit register
+ * hr: high 8-bit register
+ * d8/16: 8/16-bit data (immediate)
+ * ..i = indirect access (pointer [..])
+ * cc = condition code (z, nz, c, nc)
+ */
+static void nop();
+
+// Load instructions
+static void ld_r8_r8(uint8_t dst, uint8_t src);
+static void ld_r8_d8(uint8_t reg);
+static void ld_r16_d16(uint16_t reg);
+static void ld_hli_r8(uint8_t reg);
+static void ld_hli_d8();
+static void ld_r8_hli(uint8_t reg);
