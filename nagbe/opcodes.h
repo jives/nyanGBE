@@ -36,7 +36,7 @@
 
 // 0x1x
 #define OP_STOP         0x10
-#define OP_LD_DE_u18    0x11
+#define OP_LD_DE_u16    0x11
 #define OP_LD_DEi_A     0x12
 #define OP_INC_DE       0x13
 #define OP_INC_D        0x14
