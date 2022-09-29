@@ -8,9 +8,9 @@
  * u8: 8-bit unsigned data (immediate)
  * u16: 16-bit unsigned data (immediate)
  * a16: 16-bit address (always indirect)
- * ..i: indirect access (pointer [..])
- * ..p: increment register [..+]
- * ..m: decrement register [..-]
+ * ..i: indirect access (pointer (..))
+ * ..p: increment register ..+
+ * ..m: decrement register ..-
  */
 
 /**

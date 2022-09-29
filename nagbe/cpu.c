@@ -109,24 +109,26 @@ static inline uint8_t regmap(const uint8_t regnum)
     }
 }
 
+/** Instructions (see https://rgbds.gbdev.io/docs)
+ * Naming convention:
+ * r8/16: 8/16-bit register
+ * d8/16: 8/16-bit data (immediate)
+ * ..i: indirect access (pointer (..))
+ * ..p: increment register ..+
+ * ..m: decrement register ..-
+ * cc: condition code (z, nz, c, nc)
+ */
+
 static void nop(gameboy_t *gb)
 {
     gb->m_cycles += 1;
 }
 
-/** Instructions (see https://rgbds.gbdev.io/docs)
- * Naming convention:
- * r8/16: 8/16-bit register
- * lr: low 8-bit register
- * hr: high 8-bit register
- * d8/16: 8/16-bit data (immediate)
- * ..i = indirect access (pointer [..])
- * cc = condition code (z, nz, c, nc)
- */
+// Load Instructions
 static void ld_r8_r8(gameboy_t *gb, uint8_t opcode)
 {
-    // May be much more performant if we don't decode
-    // Generate via using macros?
+    // May be more performant if we don't decode the register numbers
+    // Generate functions using macros?
     uint8_t dst = regmap((opcode >> 3) & 0b111);
     uint8_t src = regmap(opcode & 0b111);
     gb->registers[dst] = gb->registers[src];
@@ -136,13 +138,13 @@ static void ld_r8_r8(gameboy_t *gb, uint8_t opcode)
 static void ld_r8_d8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode >> 3) & 0b111);
-    gb->registers[dst] = mem_cycle_read(gb, gb->pc);
+    gb->registers[dst] = mem_read(gb, gb->pc++);
     gb->m_cycles += 2;
 }
 
 static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
 {
-    uint16_t data = mem_cycle_read(gb, gb->pc);
+    uint16_t data = mem_read(gb, gb->pc++);
 
     switch(opcode)
     {
@@ -171,13 +173,13 @@ static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
 static void ld_hli_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
-    mem_cycle_write(gb, gb->hl, gb->registers[src]);
+    mem_write(gb, gb->hl, gb->registers[src]);
     gb->m_cycles += 2;
 }
 
 static void ld_hli_d8(gameboy_t *gb)
 {
-    uint16_t data = mem_cycle_read(gb, gb->pc);
+    uint16_t data = mem_read(gb, gb->pc++);
     mem_cycle_write(gb, gb->hl, data);
     gb->m_cycles += 3;
 }
@@ -185,11 +187,47 @@ static void ld_hli_d8(gameboy_t *gb)
 static void ld_r8_hli(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode >> 3) & 0b111);
-    gb->registers[dst] = mem_cycle_read(gb, gb->hl);
+    gb->registers[dst] = mem_read(gb, gb->hl);
     gb->m_cycles += 2;
 }
 
 static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
+{
+    uint16_t dst;
+
+    switch(opcode)
+    {
+    case 0x02:
+        dst = gb->bc;
+        break;
+    case 0x12:
+        dst = gb->de;
+        break;
+    
+    default:
+        printf("Unsupported opcode %02X for LD (r16),A", opcode);
+        assert(!"Unsupported opcode for LD (r16),A");
+        break;
+    }
+
+    mem_write(gb, dst, gb->a);
+    gb->m_cycles += 2;
+}
+
+static void ldh_d16i_a(gameboy_t *gb)
+{
+    uint8_t src_lo = mem_read(gb, gb->pc++);
+    mem_write(gb, 0xFF00+src_lo, gb->a);
+    gb->m_cycles += 3;
+}
+
+static void ldh_ci_a(gameboy_t *gb)
+{
+    mem_write(gb, 0xFF00+gb->c, gb->a);
+    gb->m_cycles += 2;
+}
+
+static void ld_a_r16i(gameboy_t *gb, uint8_t opcode)
 {
     uint16_t src;
 
@@ -203,37 +241,151 @@ static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
         break;
     
     default:
-        printf("Unsupported opcode %02X for LD (r16),A", opcode);
-        assert(!"Unsupported opcode for LD (r16),A");
+        printf("Unsupported opcode %02X for LD A,(r16)", opcode);
+        assert(!"Unsupported opcode for LD A,(r16)");
         break;
     }
 
-    gb->a = mem_cycle_read(gb, src);
+    gb->a = mem_read(gb, src);
     gb->m_cycles += 2;
 }
 
-static void ldh_d16i_a(gameboy_t *gb)
+static void ld_a_d16i(gameboy_t *gb)
 {
-    uint8_t src_lo = mem_cycle_read(gb, gb->pc);
-    mem_cycle_write(gb, 0xFF00+src_lo, gb->a);
-    gb->m_cycles += 3;
-}
-
-static void ldh_ci_a(gameboy_t *gb)
-{
-    mem_cycle_write(gb, 0xFF00+gb->c, gb->a);
-    gb->m_cycles += 2;
+    uint8_t src_lo = mem_read(gb, gb->pc++);
+    uint8_t src_hi = mem_read(gb, gb->pc++);
+    gb->a = mem_read(gb, src_lo + (src_hi << 8));
+    gb->m_cycles += 4;
 }
 
 static void ldh_a_d16i(gameboy_t *gb)
 {
-    uint8_t src_lo = mem_cycle_read(gb, gb->pc);
-    gb->a = mem_cycle_read(gb, 0xFF00+src_lo);
+    uint8_t src_lo = mem_read(gb, gb->pc++);
+    gb->a = mem_read(gb, 0xFF00+src_lo);
     gb->m_cycles += 3;
 }
 
 static void ldh_a_ci(gameboy_t *gb)
 {
-    gb->a = mem_cycle_read(gb, 0xFF00+gb->c);
+    gb->a = mem_read(gb, 0xFF00+gb->c);
     gb->m_cycles += 2;
+}
+
+static void ld_hlpi_a(gameboy_t *gb)
+{
+    mem_write(gb, gb->hl, gb->a);
+    gb->hl++;
+    gb->m_cycles += 2;
+}
+
+static void ld_hlmi_a(gameboy_t *gb)
+{
+    mem_write(gb, gb->hl, gb->a);
+    gb->hl--;
+    gb->m_cycles += 2;
+}
+
+static void ld_a_hlpi(gameboy_t *gb)
+{
+    gb->a = mem_read(gb, gb->hl);
+    gb->hl++;
+    gb->m_cycles += 2;
+}
+
+static void ld_a_hlmi(gameboy_t *gb)
+{
+    gb->a = mem_read(gb, gb->hl);
+    gb->hl--;
+    gb->m_cycles += 2;
+}
+
+static void ld_sp_d16(gameboy_t *gb)
+{
+    gb->sp = mem_read(gb, gb->pc++) + (mem_read(gb, gb->pc++) << 8);
+    gb->m_cycles += 3;
+}
+
+static void ld_d16_sp(gameboy_t *gb)
+{
+    uint16_t addr = mem_read(gb, gb->pc++) + (mem_read(gb, gb->pc++) << 8);
+    mem_write(gb, addr, gb->sp & 0xFF);
+    mem_write(gb, addr + 1, gb->sp >> 8);
+    gb->m_cycles += 5;
+}
+
+static void ld_hl_sp_i8(gameboy_t *gb)
+{
+    int16_t offset;
+    offset = (int8_t) mem_read(gb, gb->pc++);
+    gb->hl = gb->sp + offset;
+    gb->f &= ~z;
+    gb->f &= ~n;
+
+    if ((gb->sp & 0xF) + (offset & 0xF) > 0xF) {
+        gb->f |= h;
+    }
+
+    if ((gb->sp & 0xFF) + (offset & 0xFF) > 0xFF) {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 3;
+}
+
+static void ld_sp_hl(gameboy_t *gb)
+{
+    gb->sp = gb->hl;
+    gb->m_cycles += 2;
+}
+
+// 8-bit Arithmetic and Logic Instructions
+static void adc_a_r8(gameboy_t *gb, uint8_t opcode)
+{
+    uint8_t src = regmap(opcode & 0b111);
+    uint8_t value = gb->registers[src];
+    uint8_t a = gb->a;
+    uint8_t carry = (gb->f & c);
+    gb->a += carry + value;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0xF) + (value & 0xF) + carry > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) a) + value + carry > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 1;
+}
+
+static void add_a_r8(gameboy_t *gb, uint8_t opcode)
+{
+    uint8_t src = regmap(opcode & 0b111);
+    uint8_t value = gb->registers[src];
+    uint8_t a = gb->a;
+    gb->a += value;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0xF) + (value & 0xF) > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) a) + value > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 1;
 }
