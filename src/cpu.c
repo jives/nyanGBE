@@ -77,19 +77,23 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
  * @brief Maps optable register number to array register index
  * 
  * The GB optable assumes the following register order
- *      B C D E H L (HL) A
- *      0 1 2 3 4 5  6   7
+ * 
+ *      | B | C | D | E | H | L | (HL) | A |
+ *      | 0 | 1 | 2 | 3 | 4 | 5 |  6   | 7 |
+ * 
  * but our register array in memory is ordered according to
  * the actual GB layout (in big endian), so
- *      F A C B E D L H
- *      0 1 2 3 4 5 6 7
+ * 
+ *      | F | A | C | B | E | D | L | H |
+ *      | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+ * 
  * This function translates those two mappings and handles
  * indices that are out of bounds as well as the (HL) case.
  * 
  * @param regnum optable register number
  * @return uint8_t memory array register index
  */
-static inline uint8_t regmap(const uint8_t regnum)
+static inline uint8_t regmap(uint8_t regnum)
 {
     switch(regnum)
     {
@@ -100,12 +104,35 @@ static inline uint8_t regmap(const uint8_t regnum)
         case 4: return 7;
         case 5: return 6;
         // case 6 would be (HL), this is handled by
-        // ld_r8_hli and ld_hli_r8 instead
+        // hli functions instead
         case 7: return 1;
         default:
             printf("Unsupported register number %d", regnum);
             assert(!"Unsupported register number");
             break;
+    }
+}
+
+/**
+ * @brief Returns value from register indicated by number
+ * 
+ * This function value from the target register (or memory location for
+ * the (HL) case).
+ * 
+ * @param gb pointer to the gameboy state struct
+ * @param regnum optable register number
+ * @return uint8_t register value (memory value for (HL))
+ */
+static uint8_t read_reg_by_number(const gameboy_t *gb, uint8_t regnum)
+{
+    if (regnum != 6)
+    {
+        return gb->registers[regmap(regnum)];
+    }
+    else
+    {
+        // (HL)
+        return mem_read(gb, gb->hl);
     }
 }
 
@@ -148,23 +175,23 @@ static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
 
     switch(opcode)
     {
-    case 0x01:
-        gb->bc = data;
-        break;
-    case 0x11:
-        gb->de = data;
-        break;
-    case 0x21:
-        gb->hl = data;
-        break;
-    case 0x31:
-        gb->sp = data;
-        break;
-    
-    default:
-        printf("Unsupported opcode %02X for LD r16,n16", opcode);
-        assert(!"Unsupported opcode for LD r16,n16");
-        break;
+        case 0x01:
+            gb->bc = data;
+            break;
+        case 0x11:
+            gb->de = data;
+            break;
+        case 0x21:
+            gb->hl = data;
+            break;
+        case 0x31:
+            gb->sp = data;
+            break;
+        
+        default:
+            printf("Unsupported opcode %02X for LD r16,n16", opcode);
+            assert(!"Unsupported opcode for LD r16,n16");
+            break;
     }
 
     gb->m_cycles += 3;
@@ -197,17 +224,17 @@ static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
 
     switch(opcode)
     {
-    case 0x02:
-        dst = gb->bc;
-        break;
-    case 0x12:
-        dst = gb->de;
-        break;
-    
-    default:
-        printf("Unsupported opcode %02X for LD (r16),A", opcode);
-        assert(!"Unsupported opcode for LD (r16),A");
-        break;
+        case 0x02:
+            dst = gb->bc;
+            break;
+        case 0x12:
+            dst = gb->de;
+            break;
+        
+        default:
+            printf("Unsupported opcode %02X for LD (r16),A", opcode);
+            assert(!"Unsupported opcode for LD (r16),A");
+            break;
     }
 
     mem_write(gb, dst, gb->a);
@@ -233,17 +260,17 @@ static void ld_a_r16i(gameboy_t *gb, uint8_t opcode)
 
     switch(opcode)
     {
-    case 0x02:
-        src = gb->bc;
-        break;
-    case 0x12:
-        src = gb->de;
-        break;
-    
-    default:
-        printf("Unsupported opcode %02X for LD A,(r16)", opcode);
-        assert(!"Unsupported opcode for LD A,(r16)");
-        break;
+        case 0x02:
+            src = gb->bc;
+            break;
+        case 0x12:
+            src = gb->de;
+            break;
+        
+        default:
+            printf("Unsupported opcode %02X for LD A,(r16)", opcode);
+            assert(!"Unsupported opcode for LD A,(r16)");
+            break;
     }
 
     gb->a = mem_read(gb, src);
@@ -346,6 +373,7 @@ static void adc_a_r8(gameboy_t *gb, uint8_t opcode)
     uint8_t a = gb->a;
     uint8_t carry = (gb->f & c) != 0;
     gb->a += carry + value;
+    gb->f &= ~n;
 
     if (gb->a == 0)
     {
@@ -365,12 +393,65 @@ static void adc_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
+static void adc_a_hli(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t a = gb->a;
+    uint8_t carry = (gb->f & c) != 0;
+    gb->a += carry + value;
+    gb->f &= ~n;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0xF) + (value & 0xF) + carry > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) a) + value + carry > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 2;
+}
+
+static void adc_a_d8(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t a = gb->a;
+    uint8_t carry = (gb->f & c) != 0;
+    gb->a += carry + value;
+    gb->f &= ~n;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0xF) + (value & 0xF) + carry > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) a) + value + carry > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 2;
+}
+
 static void add_a_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t a = gb->a;
     gb->a += value;
+    gb->f &= ~n;
 
     if (gb->a == 0)
     {
@@ -385,6 +466,133 @@ static void add_a_r8(gameboy_t *gb, uint8_t opcode)
     if (((uint16_t) a) + value > 0xFF)
     {
         gb->f |= c;
+    }
+
+    gb->m_cycles += 1;
+}
+
+static void add_a_hli(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t a = gb->a;
+    gb->a += value;
+    gb->f &= ~n;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0xF) + (value & 0xF) > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) a) + value > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 2;
+}
+
+static void add_a_d8(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t a = gb->a;
+    gb->a += value;
+    gb->f &= ~n;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0xF) + (value & 0xF) > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) a) + value > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 2;
+}
+
+// This incudes ADD HL,SP
+static void add_hl_r16(gameboy_t *gb, uint8_t opcode)
+{
+    uint16_t value;
+    uint8_t hl = gb->hl;
+
+    switch(opcode)
+    {
+        case 0x09:
+            value = gb->bc;
+        case 0x19:
+            value = gb->de;
+        case 0x29:
+            value = gb->hl;
+        case 0x39:
+            value = gb->sp;
+        
+        default:
+        printf("Unsupported opcode %02X for ADD HL,(r16)", opcode);
+        assert(!"Unsupported opcode for ADD HL,(r16)");
+        break;
+    }
+    
+    gb->hl += value;
+    gb->f &= ~n;
+
+    if ((hl & 0xFFF) + (value & 0xFFF) > 0xFFF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint32_t) hl) + value > 0xFFFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 2;
+}
+
+static void add_sp_i8(gameboy_t *gb)
+{
+    int8_t value = mem_read(gb, gb->pc++);
+    uint8_t sp = gb->sp;
+    gb->sp += value;
+    gb->f &= ~z;
+    gb->f &= ~n;
+
+    if ((sp & 0xF) + (value & 0xF) > 0xF)
+    {
+        gb->f |= h;
+    }
+
+    if (((uint16_t) sp) + value > 0xFF)
+    {
+        gb->f |= c;
+    }
+
+    gb->m_cycles += 4;
+}
+
+static void and_a_r8(gameboy_t *gb, uint8_t opcode)
+{
+    int8_t src = regmap(opcode & 0b111);
+    uint8_t a = gb->a;
+    gb->a &= gb->registers[src];
+    gb->f &= ~n;
+    gb->f |= h;
+    gb->f &= ~c;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
     }
 
     gb->m_cycles += 1;
