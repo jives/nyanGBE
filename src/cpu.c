@@ -344,7 +344,7 @@ static void adc_a_r8(gameboy_t *gb, uint8_t opcode)
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t a = gb->a;
-    uint8_t carry = (gb->f & c);
+    uint8_t carry = (gb->f & c) != 0;
     gb->a += carry + value;
 
     if (gb->a == 0)
