@@ -1,5 +1,4 @@
-![nyanGBE logo](README/nyanGBE.png?raw=true)
-
+![nyanGBE logo](README/nyanGBE_5.png?raw=true)
 
 # nyanGBE
 
