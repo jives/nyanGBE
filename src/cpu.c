@@ -569,6 +569,255 @@ static void cp_a_d8(gameboy_t *gb)
     gb->m_cycles += 2;
 }
 
+static void dec_r8(gameboy_t *gb, uint8_t opcode)
+{
+    uint8_t dst = regmap(opcode - OP_DEC_B >> 3);
+    uint8_t value = gb->registers[dst]--;
+    gb->f &= ~(z & h);
+    gb->f |= n;
+
+    if (gb->registers[dst] == 0)
+    {
+        gb->f |= z;
+    }
+
+    // TODO: check if correct
+    if ((value & 0x0F) < 1)
+    {
+        gb->f |= h;
+    }
+
+    gb->m_cycles += 1;
+}
+
+static void dec_hli(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->hl);
+    mem_write(gb, gb->hl, value-1);
+    gb->f &= ~(z & h);
+    gb->f |= n;
+
+    if (value - 1 == 0)
+    {
+        gb->f |= z;
+    }
+
+    // TODO: check if correct
+    if ((value & 0x0F) < 1)
+    {
+        gb->f |= h;
+    }
+
+    gb->m_cycles += 3;
+}
+
+static void dec_r16(gameboy_t *gb, uint8_t opcode)
+{
+    switch(opcode)
+    {
+        case OP_DEC_BC:
+            gb->bc--;
+        case OP_DEC_DE:
+            gb->de--;
+        case OP_DEC_HL:
+            gb->hl--;
+        case OP_DEC_SP:
+            gb->sp--;
+        
+        default:
+        printf("Unsupported opcode %02X for DEC r16", opcode);
+        assert(!"Unsupported opcode for DEC r16");
+        break;
+    }
+
+    gb->m_cycles += 2;
+}
+
+static void inc_r8(gameboy_t *gb, uint8_t opcode)
+{
+    uint8_t dst = regmap(opcode - OP_INC_B >> 3);
+    uint8_t value = gb->registers[dst]++;
+    gb->f &= ~(z & h & n);
+
+    if (gb->registers[dst] == 0)
+    {
+        gb->f |= z;
+    }
+
+    // TODO: check if correct
+    if ((value & 0x0F) > 0x0F)
+    {
+        gb->f |= h;
+    }
+
+    gb->m_cycles += 1;
+}
+
+static void inc_hli(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->hl);
+    mem_write(gb, gb->hl, value+1);
+    gb->f &= ~(z & h);
+    gb->f |= n;
+
+    if (value + 1 == 0)
+    {
+        gb->f |= z;
+    }
+
+    // TODO: check if correct
+    if ((value & 0x0F) > 0x0F)
+    {
+        gb->f |= h;
+    }
+
+    gb->m_cycles += 3;
+}
+
+static void inc_r16(gameboy_t *gb, uint8_t opcode)
+{
+    switch(opcode)
+    {
+        case OP_INC_BC:
+            gb->bc++;
+        case OP_INC_DE:
+            gb->de++;
+        case OP_INC_HL:
+            gb->hl++;
+        case OP_INC_SP:
+            gb->sp++;
+        
+        default:
+        printf("Unsupported opcode %02X for INC r16", opcode);
+        assert(!"Unsupported opcode for INC r16");
+        break;
+    }
+
+    gb->m_cycles += 2;
+}
+
+static void or_a_r8(gameboy_t *gb, uint8_t opcode)
+{
+    int8_t value = read_opcode_reg(gb, opcode);
+    uint8_t a = gb->a;
+    gb->a |= value;
+    gb->f &= ~(n & c & z & h);
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    gb->m_cycles += 1;
+}
+
+static void or_a_d8(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t a = gb->a;
+    gb->a |= value;
+    gb->f &= ~(n & c & z & h);
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    gb->m_cycles += 2;
+}
+
+/**
+ * @brief Internal SBC implementation
+ * 
+ * Handles flags as well
+ * 
+ * @param gb 
+ * @param value 
+ * @param carry 
+ */
+static void _sbc(gameboy_t *gb, uint8_t value, uint8_t carry)
+{
+    uint8_t a = gb->a;
+
+    gb->a -= carry - value;
+    gb->f = 0x00;
+    gb->f |= n;
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    if ((a & 0x0F) < ((value + carry) & 0x0F))
+    {
+        gb->f |= h;
+    }
+
+    if (value + carry > a)
+    {
+        gb->f |= c;
+    }
+}
+
+/**
+ * @brief Common SUB/SBC A,r8 implementation
+ * 
+ * Carry handled depending on opcode.
+ * Covers (HL) as well.
+ * 
+ * @param gb 
+ * @param opcode 
+ */
+static void subc_a_r8(gameboy_t *gb, uint8_t opcode)
+{
+    uint8_t value = read_opcode_reg(gb, opcode);
+    uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
+    
+    _sbc(gb, value, carry);
+
+    gb->m_cycles += 1;
+}
+
+static void subc_a_d8(gameboy_t *gb, uint8_t opcode)
+{
+    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t carry = (gb->f & c) != 0  && opcode & 0x08;
+
+    _sbc(gb, value, carry);
+
+    gb->m_cycles += 2;
+}
+
+static void xor_a_r8(gameboy_t *gb, uint8_t opcode)
+{
+    int8_t value = read_opcode_reg(gb, opcode);
+    uint8_t a = gb->a;
+    gb->a ^= value;
+    gb->f &= ~(n & c & z & h);
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    gb->m_cycles += 1;
+}
+
+static void xor_a_d8(gameboy_t *gb)
+{
+    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t a = gb->a;
+    gb->a ^= value;
+    gb->f &= ~(n & c & z & h);
+
+    if (gb->a == 0)
+    {
+        gb->f |= z;
+    }
+
+    gb->m_cycles += 2;
+}
+
 // Bit Operation Instructions
 static void bit_u3_r8(gameboy_t *gb, uint8_t opcode)
 {
