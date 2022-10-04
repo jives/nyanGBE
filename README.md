@@ -8,4 +8,4 @@ A Gameboy emulator written in C.
 
 ## Attributions
 
-Nyan Cat &copy; PRguitarman
+Nyan Cat &copy; [PRguitarman](https://www.nyan.cat/index.php?cat=gb)
