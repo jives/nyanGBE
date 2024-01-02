@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Constants */
 #define GB_NUM_REG_8_BIT 8
@@ -9,10 +10,10 @@
 /* Flags */
 typedef enum __attribute__((packed)) flags
 {
-    z = 1 << 4, // Zero flag
+    c = 1 << 4, // Carry flag
     h = 1 << 5, // Half-carry flag
     n = 1 << 6, // Subtraction flag
-    c = 1 << 7  // Carry flag
+    z = 1 << 7  // Zero flag
 } flags_t;
 
 /* Main GB state */
@@ -21,7 +22,7 @@ typedef struct gb
     union
     {
         uint8_t registers[GB_NUM_REG_8_BIT];
-        //uint16_t registers[GB_NUM_REG_16_BIT];
+        // uint16_t registers[GB_NUM_REG_16_BIT];
         struct
         {
             uint16_t af;
@@ -44,6 +45,10 @@ typedef struct gb
         };
     };
     uint16_t m_cycles;
+    bool ime;
+    bool ime_enable;
+    bool halted;
+    bool stopped;
 } gameboy_t;
 
 gameboy_t gb;

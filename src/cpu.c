@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "cpu.h"
 #include "memory.h"
 #include "opcodes.h"
@@ -8,14 +9,10 @@
 /**
  * @brief Executes opcode
  *
- * Unfortunately, there is no way to calculate the correct index
- * (as implemented) from the opcode order, so this function translates
- * those two mappings and handles indices that are out of bounds as
- * well as the (HL) case.
+ * Executes standard opcode
  *
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode
- * @return uint8_t memory array register index
  */
 void execute_opcode(gameboy_t *gb, uint8_t opcode)
 {
@@ -135,6 +132,18 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
 }
 
 /**
+ * @brief Executes prefixed opcode
+ *
+ * Executes CB-prefixed opcode
+ *
+ * @param gb pointer to the gameboy state struct
+ * @param opcode gameboy opcode (without the CB prefix)
+ */
+void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
+{
+}
+
+/**
  * @brief Maps optable register number to array register index
  *
  * In the GB optable, registers are ordered the following way
@@ -204,7 +213,7 @@ static uint8_t read_opcode_reg(gameboy_t *gb, uint8_t opcode)
     {
         // (HL)
         gb->m_cycles++;
-        return mem_read(gb, gb->hl);
+        return mem_read_byte(gb, gb->hl);
     }
 }
 
@@ -237,13 +246,13 @@ static void ld_r8_r8(gameboy_t *gb, uint8_t opcode)
 static void ld_r8_d8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode >> 3) & 0b111);
-    gb->registers[dst] = mem_read(gb, gb->pc++);
+    gb->registers[dst] = mem_read_byte(gb, gb->pc++);
     gb->m_cycles += 2;
 }
 
 static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
 {
-    uint16_t data = mem_read(gb, gb->pc++) + (mem_read(gb, gb->pc++) << 8);
+    uint16_t data = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
 
     switch (opcode)
     {
@@ -272,21 +281,21 @@ static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
 static void ld_hli_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
-    mem_write(gb, gb->hl, gb->registers[src]);
+    mem_write_byte(gb, gb->hl, gb->registers[src]);
     gb->m_cycles += 2;
 }
 
 static void ld_hli_d8(gameboy_t *gb)
 {
-    uint8_t data = mem_read(gb, gb->pc++);
-    mem_write(gb, gb->hl, data);
+    uint8_t data = mem_read_byte(gb, gb->pc++);
+    mem_write_byte(gb, gb->hl, data);
     gb->m_cycles += 3;
 }
 
 static void ld_r8_hli(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode >> 3) & 0b111);
-    gb->registers[dst] = mem_read(gb, gb->hl);
+    gb->registers[dst] = mem_read_byte(gb, gb->hl);
     gb->m_cycles += 2;
 }
 
@@ -309,20 +318,20 @@ static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
         break;
     }
 
-    mem_write(gb, dst, gb->a);
+    mem_write_byte(gb, dst, gb->a);
     gb->m_cycles += 2;
 }
 
 static void ldh_d16i_a(gameboy_t *gb)
 {
-    uint8_t src_lo = mem_read(gb, gb->pc++);
-    mem_write(gb, 0xFF00 + src_lo, gb->a);
+    uint8_t src_lo = mem_read_byte(gb, gb->pc++);
+    mem_write_byte(gb, 0xFF00 + src_lo, gb->a);
     gb->m_cycles += 3;
 }
 
 static void ldh_ci_a(gameboy_t *gb)
 {
-    mem_write(gb, 0xFF00 + gb->c, gb->a);
+    mem_write_byte(gb, 0xFF00 + gb->c, gb->a);
     gb->m_cycles += 2;
 }
 
@@ -345,55 +354,55 @@ static void ld_a_r16i(gameboy_t *gb, uint8_t opcode)
         break;
     }
 
-    gb->a = mem_read(gb, src);
+    gb->a = mem_read_byte(gb, src);
     gb->m_cycles += 2;
 }
 
 static void ld_a_d16i(gameboy_t *gb)
 {
-    uint8_t src_lo = mem_read(gb, gb->pc++);
-    uint8_t src_hi = mem_read(gb, gb->pc++);
-    gb->a = mem_read(gb, src_lo + (src_hi << 8));
+    uint8_t src_lo = mem_read_byte(gb, gb->pc++);
+    uint8_t src_hi = mem_read_byte(gb, gb->pc++);
+    gb->a = mem_read_byte(gb, src_lo + (src_hi << 8));
     gb->m_cycles += 4;
 }
 
 static void ldh_a_d16i(gameboy_t *gb)
 {
-    uint8_t src_lo = mem_read(gb, gb->pc++);
-    gb->a = mem_read(gb, 0xFF00 + src_lo);
+    uint8_t src_lo = mem_read_byte(gb, gb->pc++);
+    gb->a = mem_read_byte(gb, 0xFF00 + src_lo);
     gb->m_cycles += 3;
 }
 
 static void ldh_a_ci(gameboy_t *gb)
 {
-    gb->a = mem_read(gb, 0xFF00 + gb->c);
+    gb->a = mem_read_byte(gb, 0xFF00 + gb->c);
     gb->m_cycles += 2;
 }
 
 static void ld_hlpi_a(gameboy_t *gb)
 {
-    mem_write(gb, gb->hl, gb->a);
+    mem_write_byte(gb, gb->hl, gb->a);
     gb->hl++;
     gb->m_cycles += 2;
 }
 
 static void ld_hlmi_a(gameboy_t *gb)
 {
-    mem_write(gb, gb->hl, gb->a);
+    mem_write_byte(gb, gb->hl, gb->a);
     gb->hl--;
     gb->m_cycles += 2;
 }
 
 static void ld_a_hlpi(gameboy_t *gb)
 {
-    gb->a = mem_read(gb, gb->hl);
+    gb->a = mem_read_byte(gb, gb->hl);
     gb->hl++;
     gb->m_cycles += 2;
 }
 
 static void ld_a_hlmi(gameboy_t *gb)
 {
-    gb->a = mem_read(gb, gb->hl);
+    gb->a = mem_read_byte(gb, gb->hl);
     gb->hl--;
     gb->m_cycles += 2;
 }
@@ -401,22 +410,22 @@ static void ld_a_hlmi(gameboy_t *gb)
 static void ld_sp_d16(gameboy_t *gb)
 {
     // TODO: This should be covered by the OP_LD_SP_u16 case of ld_r16_d16() already
-    gb->sp = mem_read(gb, gb->pc++) + (mem_read(gb, gb->pc++) << 8);
+    gb->sp = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
     gb->m_cycles += 3;
 }
 
 static void ld_d16_sp(gameboy_t *gb)
 {
-    uint16_t addr = mem_read(gb, gb->pc++) + (mem_read(gb, gb->pc++) << 8);
-    mem_write(gb, addr, gb->sp & 0xFF);
-    mem_write(gb, addr + 1, gb->sp >> 8);
+    uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
+    mem_write_byte(gb, addr, gb->sp & 0xFF);
+    mem_write_byte(gb, addr + 1, gb->sp >> 8);
     gb->m_cycles += 5;
 }
 
 static void ld_hl_sp_i8(gameboy_t *gb)
 {
     int16_t offset;
-    offset = (int16_t)mem_read(gb, gb->pc++);
+    offset = (int16_t)mem_read_byte(gb, gb->pc++);
     gb->hl = gb->sp + offset;
     gb->f = 0x00;
 
@@ -495,7 +504,7 @@ static void addc_a_r8(gameboy_t *gb, uint8_t opcode)
 
 static void addc_a_d8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t value = mem_read_byte(gb, gb->pc++);
     uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
 
     adc_internal(gb, value, carry);
@@ -505,7 +514,7 @@ static void addc_a_d8(gameboy_t *gb, uint8_t opcode)
 
 static void add_sp_i8(gameboy_t *gb)
 {
-    int8_t value = mem_read(gb, gb->pc++);
+    int8_t value = mem_read_byte(gb, gb->pc++);
     uint8_t sp = gb->sp;
     gb->sp += value;
     gb->f = 0x00;
@@ -526,7 +535,6 @@ static void add_sp_i8(gameboy_t *gb)
 static void and_a_r8(gameboy_t *gb, uint8_t opcode)
 {
     int8_t value = read_opcode_reg(gb, opcode);
-    // uint8_t a = gb->a;
     gb->a &= value;
     gb->f = 0x00;
     gb->f |= h;
@@ -541,8 +549,7 @@ static void and_a_r8(gameboy_t *gb, uint8_t opcode)
 
 static void and_a_d8(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->pc++);
-    // uint8_t a = gb->a;
+    uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->a &= value;
     gb->f = 0x00;
     gb->f |= h;
@@ -581,7 +588,7 @@ static void cp_a_r8(gameboy_t *gb, uint8_t opcode)
 
 static void cp_a_d8(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->f = 0x00;
     gb->f |= n;
 
@@ -626,8 +633,8 @@ static void dec_r8(gameboy_t *gb, uint8_t opcode)
 
 static void dec_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
-    mem_write(gb, gb->hl, value - 1);
+    uint8_t value = mem_read_byte(gb, gb->hl);
+    mem_write_byte(gb, gb->hl, value - 1);
     gb->f &= ~(z & h);
     gb->f |= n;
 
@@ -667,8 +674,8 @@ static void inc_r8(gameboy_t *gb, uint8_t opcode)
 
 static void inc_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
-    mem_write(gb, gb->hl, value + 1);
+    uint8_t value = mem_read_byte(gb, gb->hl);
+    mem_write_byte(gb, gb->hl, value + 1);
     gb->f &= ~(z & h);
     gb->f |= n;
 
@@ -689,7 +696,6 @@ static void inc_hli(gameboy_t *gb)
 static void or_a_r8(gameboy_t *gb, uint8_t opcode)
 {
     int8_t value = read_opcode_reg(gb, opcode);
-    // uint8_t a = gb->a;
     gb->a |= value;
     gb->f = 0x00;
 
@@ -703,8 +709,7 @@ static void or_a_r8(gameboy_t *gb, uint8_t opcode)
 
 static void or_a_d8(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->pc++);
-    // uint8_t a = gb->a;
+    uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->a |= value;
     gb->f = 0x00;
 
@@ -771,7 +776,7 @@ static void subc_a_r8(gameboy_t *gb, uint8_t opcode)
 
 static void subc_a_d8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t value = mem_read(gb, gb->pc++);
+    uint8_t value = mem_read_byte(gb, gb->pc++);
     uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
 
     sbc_internal(gb, value, carry);
@@ -782,7 +787,6 @@ static void subc_a_d8(gameboy_t *gb, uint8_t opcode)
 static void xor_a_r8(gameboy_t *gb, uint8_t opcode)
 {
     int8_t value = read_opcode_reg(gb, opcode);
-    // uint8_t a = gb->a;
     gb->a ^= value;
     gb->f = 0x00;
 
@@ -796,8 +800,7 @@ static void xor_a_r8(gameboy_t *gb, uint8_t opcode)
 
 static void xor_a_d8(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->pc++);
-    // uint8_t a = gb->a;
+    uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->a ^= value;
     gb->f = 0x00;
 
@@ -933,8 +936,8 @@ static void res_u3_r8(gameboy_t *gb, uint8_t opcode)
 static void res_u3_hli(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_RES_0_B) >> 3;
-    uint8_t value = mem_read(gb, gb->hl);
-    mem_write(gb, gb->hl, value & ~(1 << bit));
+    uint8_t value = mem_read_byte(gb, gb->hl);
+    mem_write_byte(gb, gb->hl, value & ~(1 << bit));
 
     gb->m_cycles += 4;
 }
@@ -951,8 +954,8 @@ static void set_u3_r8(gameboy_t *gb, uint8_t opcode)
 static void set_u3_hli(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_SET_0_B) >> 3;
-    uint8_t value = mem_read(gb, gb->hl);
-    mem_write(gb, gb->hl, value | (1 << bit));
+    uint8_t value = mem_read_byte(gb, gb->hl);
+    mem_write_byte(gb, gb->hl, value | (1 << bit));
 
     gb->m_cycles += 4;
 }
@@ -969,8 +972,8 @@ static void swap_r8(gameboy_t *gb, uint8_t opcode)
 
 static void swap_hli(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t value = mem_read(gb, gb->hl);
-    mem_write(gb, gb->hl, ((value >> 4) & 0x0F) | ((value << 4) & 0xF0));
+    uint8_t value = mem_read_byte(gb, gb->hl);
+    mem_write_byte(gb, gb->hl, ((value >> 4) & 0x0F) | ((value << 4) & 0xF0));
 
     gb->m_cycles += 4;
 }
@@ -1001,13 +1004,13 @@ static void rl_r8(gameboy_t *gb, uint8_t opcode)
 
 static void rl_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (gb->f & c) != 0;
     uint8_t b7 = (value & 0x80) != 0;
 
     gb->f = 0x00;
     value = (value << 1) | carry;
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (b7)
     {
@@ -1046,12 +1049,12 @@ static void rlc_r8(gameboy_t *gb, uint8_t opcode)
 
 static void rlc_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (value & 0x80) != 0;
 
     gb->f = 0x00;
     value = (value << 1) | carry;
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (carry)
     {
@@ -1091,13 +1094,13 @@ static void rr_r8(gameboy_t *gb, uint8_t opcode)
 
 static void rr_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (gb->f & c) != 0;
     uint8_t b0 = (value & 0x01) != 0;
 
     gb->f = 0x00;
     value = (value >> 1) | (carry << 7);
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (b0)
     {
@@ -1136,12 +1139,12 @@ static void rrc_r8(gameboy_t *gb, uint8_t opcode)
 
 static void rrc_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (value & 0x01) != 0;
 
     gb->f = 0x00;
     value = (value >> 1) | (carry << 7);
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (carry)
     {
@@ -1180,12 +1183,12 @@ static void sla_r8(gameboy_t *gb, uint8_t opcode)
 
 static void sla_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (value & 0x80) != 0;
 
     gb->f = 0x00;
     value = value << 1;
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (carry)
     {
@@ -1224,7 +1227,7 @@ static void sra_r8(gameboy_t *gb, uint8_t opcode)
 
 static void sra_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t b7 = (value & 0x80);
 
     gb->f = 0x00;
@@ -1235,7 +1238,7 @@ static void sra_hli(gameboy_t *gb)
     }
 
     value = (value >> 1) | b7;
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (value == 0)
     {
@@ -1268,7 +1271,7 @@ static void srl_r8(gameboy_t *gb, uint8_t opcode)
 
 static void srl_hli(gameboy_t *gb)
 {
-    uint8_t value = mem_read(gb, gb->hl);
+    uint8_t value = mem_read_byte(gb, gb->hl);
 
     gb->f = 0x00;
 
@@ -1278,7 +1281,7 @@ static void srl_hli(gameboy_t *gb)
     }
 
     value = (value >> 1);
-    mem_write(gb, gb->hl, value);
+    mem_write_byte(gb, gb->hl, value);
 
     if (value == 0)
     {
@@ -1289,48 +1292,154 @@ static void srl_hli(gameboy_t *gb)
 }
 
 // Jumps and Subroutines
-static void call_d16(gameboy_t *gb)
+/**
+ * @brief Checks if condition is met
+ *
+ * @param gb gameboy state struct
+ * @param opcode gameboy opcode
+ * @return true if the condition is met
+ * @return false otherwise
+ */
+static bool check_condition(gameboy_t *gb, uint8_t opcode)
 {
+    switch ((opcode >> 3) & 0x3)
+    {
+    case 0:
+        return !(gb->f & z);
+    case 1:
+        return (gb->f & z);
+    case 2:
+        return !(gb->f & c);
+    case 3:
+        return (gb->f & c);
+    }
+
+    return false;
 }
 
-static void call_cc_d16(gameboy_t *gb)
+static void call_d16(gameboy_t *gb)
 {
+    uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
+    mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
+    mem_write_byte(gb, --gb->sp, (gb->pc) & 0xFF);
+    gb->pc = addr;
+
+    gb->m_cycles += 6;
+}
+
+static void call_cc_d16(gameboy_t *gb, uint8_t opcode)
+{
+    uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
+
+    if (check_condition(gb, opcode))
+    {
+        mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
+        mem_write_byte(gb, --gb->sp, (gb->pc) & 0xFF);
+        gb->pc = addr;
+
+        gb->m_cycles += 6;
+    }
+    else
+    {
+        gb->m_cycles += 3;
+    }
 }
 
 static void jp_hl(gameboy_t *gb)
 {
+    gb->pc = gb->hl;
+
+    gb->m_cycles += 1;
 }
 
 static void jp_d16(gameboy_t *gb)
 {
+    uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
+    gb->pc = addr;
+
+    gb->m_cycles += 4;
 }
 
-static void jp_cc_d16(gameboy_t *gb)
+static void jp_cc_d16(gameboy_t *gb, uint8_t opcode)
 {
+    uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
+
+    if (check_condition(gb, opcode))
+    {
+        gb->pc = addr;
+
+        gb->m_cycles += 4;
+    }
+    else
+    {
+        gb->m_cycles += 3;
+    }
 }
 
-static void jr_d16(gameboy_t *gb)
+static void jr_d8(gameboy_t *gb)
 {
+    int8_t offset = mem_read_byte(gb, gb->pc++);
+    gb->pc += offset;
+
+    gb->m_cycles += 3;
 }
 
-static void jr_cc_d16(gameboy_t *gb)
+static void jr_cc_d8(gameboy_t *gb, uint8_t opcode)
 {
+    int8_t offset = mem_read_byte(gb, gb->pc++);
+
+    if (check_condition(gb, opcode))
+    {
+        gb->pc += offset;
+
+        gb->m_cycles += 3;
+    }
+    else
+    {
+        gb->m_cycles += 2;
+    }
 }
 
-static void ret_cc(gameboy_t *gb)
+static void ret_cc(gameboy_t *gb, uint8_t opcode)
 {
+    uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
+
+    if (check_condition(gb, opcode))
+    {
+        gb->pc = addr;
+
+        gb->m_cycles += 5;
+    }
+    else
+    {
+        gb->m_cycles += 2;
+    }
 }
 
 static void ret(gameboy_t *gb)
 {
+    uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
+    gb->pc = addr;
+
+    gb->m_cycles += 4;
 }
 
 static void reti(gameboy_t *gb)
 {
+    uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
+    gb->pc = addr;
+    gb->ime = true;
+
+    gb->m_cycles += 4;
 }
 
-static void rst_vec(gameboy_t *gb)
+static void rst(gameboy_t *gb, uint8_t opcode)
 {
+    mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
+    mem_write_byte(gb, --gb->sp, (gb->pc) & 0xFF);
+    gb->pc = opcode ^ 0xC7;
+
+    gb->m_cycles += 4;
 }
 
 // Stack Operation Instructions
@@ -1339,43 +1448,156 @@ static void rst_vec(gameboy_t *gb)
 
 static void pop_r16(gameboy_t *gb, uint8_t opcode)
 {
+    uint16_t value = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
+
+    switch (opcode)
+    {
+    case OP_POP_AF:
+        gb->af = value & 0xFFF0; // Make sure we don't set impossible flags in reg. f
+        break;
+    case OP_POP_BC:
+        gb->bc = value;
+        break;
+    case OP_POP_DE:
+        gb->de = value;
+        break;
+    case OP_POP_HL:
+        gb->hl = value;
+        break;
+
+    default:
+        printf("Unsupported opcode %02X for POP r16", opcode);
+        assert(!"Unsupported opcode for POP r16");
+        break;
+    }
+
+    gb->m_cycles += 3;
 }
 
 static void push_r16(gameboy_t *gb, uint8_t opcode)
 {
+    switch (opcode)
+    {
+    case OP_PUSH_AF:
+        mem_write_byte(gb, --gb->sp, (gb->af) >> 8);
+        mem_write_byte(gb, --gb->sp, (gb->af) & 0xFF);
+        break;
+    case OP_PUSH_BC:
+        mem_write_byte(gb, --gb->sp, (gb->bc) >> 8);
+        mem_write_byte(gb, --gb->sp, (gb->bc) & 0xFF);
+        break;
+    case OP_PUSH_DE:
+        mem_write_byte(gb, --gb->sp, (gb->de) >> 8);
+        mem_write_byte(gb, --gb->sp, (gb->de) & 0xFF);
+        break;
+    case OP_PUSH_HL:
+        mem_write_byte(gb, --gb->sp, (gb->hl) >> 8);
+        mem_write_byte(gb, --gb->sp, (gb->hl) & 0xFF);
+        break;
+
+    default:
+        printf("Unsupported opcode %02X for PUSH r16", opcode);
+        assert(!"Unsupported opcode for PUSH r16");
+        break;
+    }
+
+    gb->m_cycles += 4;
 }
 
 // Miscellaneous Instructions
 static void ccf(gameboy_t *gb)
 {
+    gb->f &= ~n;
+    gb->f &= ~h;
+    gb->f ^= c;
+
+    gb->m_cycles += 1;
 }
 
 static void cpl(gameboy_t *gb)
 {
+    uint8_t value = gb->a;
+    gb->a = ~value;
+    gb->f |= n;
+    gb->f |= h;
+
+    gb->m_cycles += 1;
 }
 
 static void daa(gameboy_t *gb)
 {
+    uint8_t result = gb->a;
+
+    if (gb->f & n)
+    {
+        // Subtraction
+        if (gb->f & c)
+            result -= 0x60;
+
+        if (gb->f & h)
+            result = (result - 0x06) & 0xFF;
+    }
+    else
+    {
+        // Addition
+        if ((gb->f & c) || result > 0x99)
+        {
+            result += 0x60;
+            // TODO: Check if c-flag handling is correct
+            gb->f |= c;
+        }
+
+        if ((gb->f & h) || (result & 0x0F) > 0x9)
+            result += 0x06;
+    }
+
+    if (result == 0)
+        gb->f |= z;
+
+    gb->f &= h;
+    gb->a = result;
+
+    gb->m_cycles += 1;
 }
 
 static void di(gameboy_t *gb)
 {
+    gb->ime = false;
+
+    gb->m_cycles += 1;
 }
 
 static void ei(gameboy_t *gb)
 {
+    // EI actually enables interrupts after one additional cycle
+    gb->ime_enable = true;
+
+    gb->m_cycles += 1;
 }
 
 static void halt(gameboy_t *gb)
 {
+    // TODO: Implement halt bug
+    gb->halted = true;
+
+    gb->m_cycles += 1;
 }
 
 // NOP covered already above
 
 static void scf(gameboy_t *gb)
 {
+    gb->f &= ~n;
+    gb->f &= ~h;
+    gb->f |= c;
+
+    gb->m_cycles += 1;
 }
 
 static void stop(gameboy_t *gb)
 {
+    // TODO: Extend behavior?
+    gb->stopped = true;
+
+    gb->m_cycles += 1;
 }
