@@ -7,143 +7,6 @@
 #include "opcodes.h"
 
 /**
- * @brief Executes opcode
- *
- * Executes standard opcode
- *
- * @param gb pointer to the gameboy state struct
- * @param opcode gameboy opcode
- */
-void execute_opcode(gameboy_t *gb, uint8_t opcode)
-{
-    switch (opcode)
-    {
-    case OP_NOP:
-    {
-        nop(gb);
-        break;
-    }
-
-    case OP_LD_B_u8:
-    case OP_LD_C_u8:
-    case OP_LD_D_u8:
-    case OP_LD_E_u8:
-    case OP_LD_H_u8:
-    case OP_LD_L_u8:
-    case OP_LD_A_u8:
-    {
-        ld_r8_d8(gb, opcode);
-        break;
-    }
-
-    case OP_LD_BC_u16:
-    case OP_LD_DE_u16:
-    case OP_LD_HL_u16:
-    case OP_LD_SP_u16:
-    {
-        ld_r16_d16(gb, opcode);
-        break;
-    }
-
-    case OP_LD_B_B:
-    case OP_LD_B_C:
-    case OP_LD_B_D:
-    case OP_LD_B_E:
-    case OP_LD_B_H:
-    case OP_LD_B_L:
-    case OP_LD_B_A:
-    case OP_LD_C_B:
-    case OP_LD_C_C:
-    case OP_LD_C_D:
-    case OP_LD_C_E:
-    case OP_LD_C_H:
-    case OP_LD_C_L:
-    case OP_LD_C_A:
-    case OP_LD_D_B:
-    case OP_LD_D_C:
-    case OP_LD_D_D:
-    case OP_LD_D_E:
-    case OP_LD_D_H:
-    case OP_LD_D_L:
-    case OP_LD_D_A:
-    case OP_LD_E_B:
-    case OP_LD_E_C:
-    case OP_LD_E_D:
-    case OP_LD_E_E:
-    case OP_LD_E_H:
-    case OP_LD_E_L:
-    case OP_LD_E_A:
-    case OP_LD_H_B:
-    case OP_LD_H_C:
-    case OP_LD_H_D:
-    case OP_LD_H_E:
-    case OP_LD_H_H:
-    case OP_LD_H_L:
-    case OP_LD_H_A:
-    case OP_LD_L_B:
-    case OP_LD_L_C:
-    case OP_LD_L_D:
-    case OP_LD_L_E:
-    case OP_LD_L_H:
-    case OP_LD_L_L:
-    case OP_LD_L_A:
-    {
-        ld_r8_r8(gb, opcode);
-        break;
-    }
-
-    case OP_LD_HLi_B:
-    case OP_LD_HLi_C:
-    case OP_LD_HLi_D:
-    case OP_LD_HLi_E:
-    case OP_LD_HLi_H:
-    case OP_LD_HLi_L:
-    case OP_LD_HLi_A:
-    {
-        ld_hli_r8(gb, opcode);
-        break;
-    }
-
-    case OP_LD_HLi_u8:
-        ld_hli_d8(gb);
-        break;
-
-    case OP_LD_B_HLi:
-    case OP_LD_C_HLi:
-    case OP_LD_D_HLi:
-    case OP_LD_E_HLi:
-    case OP_LD_H_HLi:
-    case OP_LD_L_HLi:
-    case OP_LD_A_HLi:
-    {
-        ld_r8_hli(gb, opcode);
-        break;
-    }
-
-        // ...
-
-    default:
-    {
-        printf("Unhandled opcode: %02X", opcode);
-        assert(!"Unhandled opcode");
-        break;
-    }
-    }
-}
-
-/**
- * @brief Executes prefixed opcode
- *
- * Executes CB-prefixed opcode
- *
- * @param gb pointer to the gameboy state struct
- * @param opcode gameboy opcode (without the CB prefix)
- */
-void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
-{
-}
-
-/**
  * @brief Maps optable register number to array register index
  *
  * In the GB optable, registers are ordered the following way
@@ -502,6 +365,14 @@ static void addc_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
+/**
+ * @brief Common ADD/ADC A,d8 implementation
+ *
+ * Carry handled depending on opcode.
+ *
+ * @param gb pointer to the gameboy state struct
+ * @param opcode gameboy opcode
+ */
 static void addc_a_d8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
@@ -1600,4 +1471,263 @@ static void stop(gameboy_t *gb)
     gb->stopped = true;
 
     gb->m_cycles += 1;
+}
+
+/**
+ * @brief Executes opcode
+ *
+ * Executes standard opcode
+ *
+ * @param gb pointer to the gameboy state struct
+ * @param opcode gameboy opcode
+ */
+void execute_opcode(gameboy_t *gb, uint8_t opcode)
+{
+    switch (opcode)
+    {
+    case OP_NOP:
+    {
+        nop(gb);
+        break;
+    }
+
+    // Load Instructions
+    case OP_LD_B_u8:
+    case OP_LD_C_u8:
+    case OP_LD_D_u8:
+    case OP_LD_E_u8:
+    case OP_LD_H_u8:
+    case OP_LD_L_u8:
+    case OP_LD_A_u8:
+    {
+        ld_r8_d8(gb, opcode);
+        break;
+    }
+
+    case OP_LD_BC_u16:
+    case OP_LD_DE_u16:
+    case OP_LD_HL_u16:
+    case OP_LD_SP_u16:
+    {
+        ld_r16_d16(gb, opcode);
+        break;
+    }
+
+    case OP_LD_B_B:
+    case OP_LD_B_C:
+    case OP_LD_B_D:
+    case OP_LD_B_E:
+    case OP_LD_B_H:
+    case OP_LD_B_L:
+    case OP_LD_B_A:
+    case OP_LD_C_B:
+    case OP_LD_C_C:
+    case OP_LD_C_D:
+    case OP_LD_C_E:
+    case OP_LD_C_H:
+    case OP_LD_C_L:
+    case OP_LD_C_A:
+    case OP_LD_D_B:
+    case OP_LD_D_C:
+    case OP_LD_D_D:
+    case OP_LD_D_E:
+    case OP_LD_D_H:
+    case OP_LD_D_L:
+    case OP_LD_D_A:
+    case OP_LD_E_B:
+    case OP_LD_E_C:
+    case OP_LD_E_D:
+    case OP_LD_E_E:
+    case OP_LD_E_H:
+    case OP_LD_E_L:
+    case OP_LD_E_A:
+    case OP_LD_H_B:
+    case OP_LD_H_C:
+    case OP_LD_H_D:
+    case OP_LD_H_E:
+    case OP_LD_H_H:
+    case OP_LD_H_L:
+    case OP_LD_H_A:
+    case OP_LD_L_B:
+    case OP_LD_L_C:
+    case OP_LD_L_D:
+    case OP_LD_L_E:
+    case OP_LD_L_H:
+    case OP_LD_L_L:
+    case OP_LD_L_A:
+    {
+        ld_r8_r8(gb, opcode);
+        break;
+    }
+
+    case OP_LD_HLi_B:
+    case OP_LD_HLi_C:
+    case OP_LD_HLi_D:
+    case OP_LD_HLi_E:
+    case OP_LD_HLi_H:
+    case OP_LD_HLi_L:
+    case OP_LD_HLi_A:
+    {
+        ld_hli_r8(gb, opcode);
+        break;
+    }
+
+    case OP_LD_HLi_u8:
+        ld_hli_d8(gb);
+        break;
+
+    case OP_LD_B_HLi:
+    case OP_LD_C_HLi:
+    case OP_LD_D_HLi:
+    case OP_LD_E_HLi:
+    case OP_LD_H_HLi:
+    case OP_LD_L_HLi:
+    case OP_LD_A_HLi:
+    {
+        ld_r8_hli(gb, opcode);
+        break;
+    }
+
+    case OP_LD_BCi_A:
+    case OP_LD_DEi_A:
+    {
+        ld_r16i_a(gb, opcode);
+        break;
+    }
+
+    case OP_LDH_u16i_A:
+    {
+        ldh_d16i_a(gb);
+        break;
+    }
+
+    case OP_LDH_Ci_A:
+    {
+        ldh_ci_a(gb);
+        break;
+    }
+
+    case OP_LD_A_BCi:
+    case OP_LD_A_DEi:
+    {
+        ld_a_r16i(gb, opcode);
+        break;
+    }
+
+    case OP_LD_A_u16i:
+    {
+        ld_a_d16i(gb);
+        break;
+    }
+
+    case OP_LDH_A_u16i:
+    {
+        ldh_a_d16i(gb);
+        break;
+    }
+
+    case OP_LDH_A_Ci:
+    {
+        ldh_a_ci(gb);
+        break;
+    }
+
+    case OP_LD_HLpi_A:
+    {
+        ld_hlpi_a(gb);
+        break;
+    }
+
+    case OP_LD_HLmi_A:
+    {
+        ld_hlmi_a(gb);
+        break;
+    }
+
+    case OP_LD_A_HLpi:
+    {
+        ld_a_hlpi(gb);
+        break;
+    }
+
+    case OP_LD_A_HLmi:
+    {
+        ld_a_hlmi(gb);
+        break;
+    }
+
+    case OP_LD_a16i_SP:
+    {
+        ld_d16_sp(gb);
+        break;
+    }
+
+    case OP_LD_HL_SP_i8:
+    {
+        ld_hl_sp_i8(gb);
+        break;
+    }
+
+    case OP_LD_SP_HL:
+    {
+        ld_sp_hl(gb);
+        break;
+    }
+
+    // 8-bit Arithmetic and Logic Instructions
+    case OP_ADD_A_A:
+    case OP_ADD_A_B:
+    case OP_ADD_A_C:
+    case OP_ADD_A_D:
+    case OP_ADD_A_E:
+    case OP_ADD_A_H:
+    case OP_ADD_A_L:
+    case OP_ADD_A_HLi:
+    case OP_ADC_A_A:
+    case OP_ADC_A_B:
+    case OP_ADC_A_C:
+    case OP_ADC_A_D:
+    case OP_ADC_A_E:
+    case OP_ADC_A_H:
+    case OP_ADC_A_L:
+    case OP_ADC_A_HLi:
+    {
+        addc_a_r8(gb, opcode);
+        break;
+    }
+
+    case OP_ADD_A_u8:
+    case OP_ADC_A_u8:
+    {
+        addc_a_d8(gb, opcode);
+        break;
+    }
+
+    case OP_ADD_SP_i8:
+    {
+        add_sp_i8(gb);
+        break;
+    }
+
+        // ...
+
+    default:
+    {
+        printf("Unhandled opcode: %02X", opcode);
+        assert(!"Unhandled opcode");
+        break;
+    }
+    }
+}
+
+/**
+ * @brief Executes prefixed opcode
+ *
+ * Executes CB-prefixed opcode
+ *
+ * @param gb pointer to the gameboy state struct
+ * @param opcode gameboy opcode (without the CB prefix)
+ */
+void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
+{
 }
