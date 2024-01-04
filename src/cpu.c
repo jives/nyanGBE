@@ -49,7 +49,7 @@ static inline uint8_t regmap(uint8_t regnum)
     case 7:
         return 1;
     default:
-        printf("Unsupported register number %d", regnum);
+        printf("Unsupported register number %d\n", regnum);
         assert(!"Unsupported register number");
         return 0;
     }
@@ -871,12 +871,20 @@ static void rl_r8(gameboy_t *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (gb->registers[src] == 0)
+    if (opcode == OP_RLA)
     {
-        gb->f |= z;
+        gb->m_cycles += 1;
     }
+    else
+    {
+        // RLA does not set the zero flag
+        if (gb->registers[src] == 0)
+        {
+            gb->f |= z;
+        }
 
-    gb->m_cycles += 2;
+        gb->m_cycles += 2;
+    }
 }
 
 static void rl_hli(gameboy_t *gb)
@@ -916,12 +924,20 @@ static void rlc_r8(gameboy_t *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (gb->registers[src] == 0)
+    if (opcode == OP_RLCA)
     {
-        gb->f |= z;
+        gb->m_cycles += 1;
     }
+    else
+    {
+        // RLCA does not set the zero flag
+        if (gb->registers[src] == 0)
+        {
+            gb->f |= z;
+        }
 
-    gb->m_cycles += 2;
+        gb->m_cycles += 2;
+    }
 }
 
 static void rlc_hli(gameboy_t *gb)
@@ -967,7 +983,7 @@ static void rr_r8(gameboy_t *gb, uint8_t opcode)
     }
     else
     {
-        // It seems that RRA does not set the zero flag
+        // RRA does not set the zero flag
         if (gb->registers[src] == 0)
         {
             gb->f |= z;
@@ -1019,7 +1035,7 @@ static void rrc_r8(gameboy_t *gb, uint8_t opcode)
     }
     else
     {
-        // It seems that RRCA does not set the zero flag
+        // RRCA does not set the zero flag
         if (gb->registers[src] == 0)
         {
             gb->f |= z;
@@ -1885,15 +1901,27 @@ static void execute_opcode(gameboy_t *gb, uint8_t opcode)
         break;
     }
 
-    case OP_RRA:
+    case OP_RLCA:
     {
-        rr_r8(gb, opcode);
+        rlc_r8(gb, opcode);
         break;
     }
 
     case OP_RRCA:
     {
         rrc_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RLA:
+    {
+        rl_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RRA:
+    {
+        rr_r8(gb, opcode);
         break;
     }
 
