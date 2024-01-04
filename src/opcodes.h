@@ -60,7 +60,7 @@
 #define OP_INC_H        0x24
 #define OP_DEC_H        0x25
 #define OP_LD_H_u8      0x26
-#define OP_DDA          0x27
+#define OP_DAA          0x27
 #define OP_JR_Z_i8      0x28
 #define OP_ADD_HL_HL    0x29
 #define OP_LD_A_HLpi    0x2A
@@ -298,7 +298,7 @@
 #define OP_LD_HL_SP_i8  0xF8
 #define OP_LD_SP_HL     0xF9
 #define OP_LD_A_u16i    0xFA
-#define OP_EI           0xF3
+#define OP_EI           0xFB
 //#define OP_UNDEFINED  0xFC
 //#define OP_UNDEFINED  0xFD
 #define OP_CP_A_u8      0xFE
@@ -589,7 +589,7 @@
 #define OP_SET_7_B      0xF8
 #define OP_SET_7_C      0xF9
 #define OP_SET_7_D      0xFA
-#define OP_SET_7_E      0xF3
+#define OP_SET_7_E      0xFB
 #define OP_SET_7_H      0xFC
 #define OP_SET_7_L      0xFD
 #define OP_SET_7_HLi    0xFE
