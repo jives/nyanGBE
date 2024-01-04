@@ -1421,28 +1421,28 @@ static void cpl(gameboy_t *gb)
 static void daa(gameboy_t *gb)
 {
     uint16_t result = gb->a;
+    gb->f &= ~z;
 
     if (gb->f & n)
     {
-        // Subtraction
+        // Last operation was a subtraction
+        if (gb->f & h)
+            result -= 0x06;
         if (gb->f & c)
             result -= 0x60;
-
-        if (gb->f & h)
-            result = (result - 0x06) & 0xFF;
     }
     else
     {
-        // Addition
+        // Last operation was an addition
+        if ((gb->f & h) || ((result & 0x0F) > 0x09))
+            result += 0x06;
+
         if ((gb->f & c) || (result > 0x9F))
         {
             result += 0x60;
             // TODO: Check if c-flag handling is correct
             gb->f |= c;
         }
-
-        if ((gb->f & h) || ((result & 0x0F) > 0x9))
-            result += 0x06;
     }
 
     if ((result & 0xFF) == 0)
