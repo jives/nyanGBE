@@ -49,6 +49,11 @@ typedef struct gb
     bool ime_enable;
     bool halted;
     bool stopped;
+    uint8_t rom[0x8000];
+    uint8_t ram[0x8000];
 } gameboy_t;
 
-gameboy_t gb;
+void gb_init(gameboy_t *gb);
+void gb_run(gameboy_t *gb);
+int gb_load_rom(gameboy_t *gb, const char *path);
+void gb_log_state(gameboy_t *gb, FILE *log_file, bool gbdoc);
