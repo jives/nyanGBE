@@ -133,7 +133,7 @@ static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for LD r16,n16", opcode);
+        printf("Unsupported opcode 0x%02X for LD r16,n16\n", opcode);
         assert(!"Unsupported opcode for LD r16,n16");
         break;
     }
@@ -176,13 +176,21 @@ static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for LD (r16),A", opcode);
+        printf("Unsupported opcode 0x%02X for LD (r16),A\n", opcode);
         assert(!"Unsupported opcode for LD (r16),A");
         break;
     }
 
     mem_write_byte(gb, dst, gb->a);
     gb->m_cycles += 2;
+}
+
+static void ld_d16i_a(gameboy_t *gb)
+{
+    uint8_t src_lo = mem_read_byte(gb, gb->pc++);
+    uint8_t src_hi = mem_read_byte(gb, gb->pc++);
+    mem_write_byte(gb, src_lo + (src_hi << 8), gb->a);
+    gb->m_cycles += 4;
 }
 
 static void ldh_d16i_a(gameboy_t *gb)
@@ -212,7 +220,7 @@ static void ld_a_r16i(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for LD A,(r16)", opcode);
+        printf("Unsupported opcode 0x%02X for LD A,(r16)\n", opcode);
         assert(!"Unsupported opcode for LD A,(r16)");
         break;
     }
@@ -272,7 +280,7 @@ static void ld_a_hlmi(gameboy_t *gb)
 
 static void ld_sp_d16(gameboy_t *gb)
 {
-    // TODO: This should be covered by the OP_LD_SP_u16 case of ld_r16_d16() already
+    // Note: This is covered by the OP_LD_SP_u16 case of ld_r16_d16() already
     gb->sp = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
     gb->m_cycles += 3;
 }
@@ -485,7 +493,7 @@ static void dec_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode - OP_DEC_B) >> 3);
     uint8_t value = gb->registers[dst]--;
-    gb->f &= ~(z & h);
+    gb->f &= ~(z | h);
     gb->f |= n;
 
     if (gb->registers[dst] == 0)
@@ -506,7 +514,7 @@ static void dec_hli(gameboy_t *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, value - 1);
-    gb->f &= ~(z & h);
+    gb->f &= ~(z | h);
     gb->f |= n;
 
     if (value - 1 == 0)
@@ -527,15 +535,14 @@ static void inc_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode - OP_INC_B) >> 3);
     uint8_t value = gb->registers[dst]++;
-    gb->f &= ~(z & h & n);
+    gb->f &= ~(z | h | n);
 
     if (gb->registers[dst] == 0)
     {
         gb->f |= z;
     }
 
-    // TODO: check if correct
-    if ((value & 0x0F) > 0x0F)
+    if ((value & 0x0F) == 0x0F)
     {
         gb->f |= h;
     }
@@ -547,7 +554,7 @@ static void inc_hli(gameboy_t *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, value + 1);
-    gb->f &= ~(z & h);
+    gb->f &= ~(z | h);
     gb->f |= n;
 
     if (value + 1 == 0)
@@ -555,8 +562,7 @@ static void inc_hli(gameboy_t *gb)
         gb->f |= z;
     }
 
-    // TODO: check if correct
-    if ((value & 0x0F) > 0x0F)
+    if ((value & 0x0F) == 0x0F)
     {
         gb->f |= h;
     }
@@ -688,7 +694,7 @@ static void xor_a_d8(gameboy_t *gb)
 static void add_hl_r16(gameboy_t *gb, uint8_t opcode)
 {
     uint16_t value;
-    uint8_t hl = gb->hl;
+    uint16_t hl = gb->hl;
 
     switch (opcode)
     {
@@ -706,13 +712,13 @@ static void add_hl_r16(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for ADD HL,(r16)", opcode);
+        printf("Unsupported opcode 0x%02X for ADD HL,(r16)\n", opcode);
         assert(!"Unsupported opcode for ADD HL,(r16)");
         break;
     }
 
     gb->hl += value;
-    gb->f &= ~(n & h & c);
+    gb->f &= ~(n | h | c);
 
     if ((hl & 0xFFF) + (value & 0xFFF) > 0xFFF)
     {
@@ -745,7 +751,7 @@ static void dec_r16(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for DEC r16", opcode);
+        printf("Unsupported opcode 0x%02X for DEC r16\n", opcode);
         assert(!"Unsupported opcode for DEC r16");
         break;
     }
@@ -771,7 +777,7 @@ static void inc_r16(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for INC r16", opcode);
+        printf("Unsupported opcode 0x%02X for INC r16\n", opcode);
         assert(!"Unsupported opcode for INC r16");
         break;
     }
@@ -779,12 +785,12 @@ static void inc_r16(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-// Bit Operation Instructions
+// Bit Operation Instructions (OxCB prefixed)
 static void bit_u3_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_BIT_0_B) >> 3;
     uint8_t value = read_opcode_reg(gb, opcode);
-    gb->f &= ~(n & z);
+    gb->f &= ~(n | z);
     gb->f |= h;
 
     if (!(value & (1 << bit)))
@@ -798,7 +804,7 @@ static void bit_u3_r8(gameboy_t *gb, uint8_t opcode)
 static void res_u3_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_RES_0_B) >> 3;
-    uint8_t dst = regmap(opcode);
+    uint8_t dst = regmap(opcode & 0b111);
     gb->registers[dst] &= ~(1 << bit);
 
     gb->m_cycles += 2;
@@ -816,7 +822,7 @@ static void res_u3_hli(gameboy_t *gb, uint8_t opcode)
 static void set_u3_r8(gameboy_t *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_SET_0_B) >> 3;
-    uint8_t dst = regmap(opcode);
+    uint8_t dst = regmap(opcode & 0b111);
     gb->registers[dst] |= 1 << bit;
 
     gb->m_cycles += 2;
@@ -833,7 +839,7 @@ static void set_u3_hli(gameboy_t *gb, uint8_t opcode)
 
 static void swap_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t dst = regmap(opcode);
+    uint8_t dst = regmap(opcode & 0b111);
     uint8_t value = gb->registers[dst];
 
     gb->registers[dst] = ((value >> 4) & 0x0F) | ((value << 4) & 0xF0);
@@ -841,7 +847,7 @@ static void swap_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void swap_hli(gameboy_t *gb, uint8_t opcode)
+static void swap_hli(gameboy_t *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, ((value >> 4) & 0x0F) | ((value << 4) & 0xF0));
@@ -849,10 +855,10 @@ static void swap_hli(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 4;
 }
 
-// Bit Shift Instructions
+// Bit Shift Instructions (OxCB prefixed)
 static void rl_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t carry = (gb->f & c) != 0;
     uint8_t b7 = (value & 0x80) != 0;
@@ -898,7 +904,7 @@ static void rl_hli(gameboy_t *gb)
 
 static void rlc_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t carry = (value & 0x80) != 0;
 
@@ -942,7 +948,7 @@ static void rlc_hli(gameboy_t *gb)
 
 static void rr_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t carry = (gb->f & c) != 0;
     uint8_t b0 = (value & 0x01) != 0;
@@ -955,12 +961,19 @@ static void rr_r8(gameboy_t *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (gb->registers[src] == 0)
+    if (opcode == OP_RRA)
     {
-        gb->f |= z;
+        gb->m_cycles += 1;
     }
-
-    gb->m_cycles += 2;
+    else
+    {
+        // It seems that RRA does not set the zero flag
+        if (gb->registers[src] == 0)
+        {
+            gb->f |= z;
+        }
+        gb->m_cycles += 2;
+    }
 }
 
 static void rr_hli(gameboy_t *gb)
@@ -988,7 +1001,7 @@ static void rr_hli(gameboy_t *gb)
 
 static void rrc_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t carry = (value & 0x01) != 0;
 
@@ -1000,12 +1013,19 @@ static void rrc_r8(gameboy_t *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (gb->registers[src] == 0)
+    if (opcode == OP_RRCA)
     {
-        gb->f |= z;
+        gb->m_cycles += 1;
     }
-
-    gb->m_cycles += 2;
+    else
+    {
+        // It seems that RRCA does not set the zero flag
+        if (gb->registers[src] == 0)
+        {
+            gb->f |= z;
+        }
+        gb->m_cycles += 2;
+    }
 }
 
 static void rrc_hli(gameboy_t *gb)
@@ -1032,7 +1052,7 @@ static void rrc_hli(gameboy_t *gb)
 
 static void sla_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t carry = (value & 0x80) != 0;
 
@@ -1076,7 +1096,7 @@ static void sla_hli(gameboy_t *gb)
 
 static void sra_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
     uint8_t b7 = (value & 0x80);
 
@@ -1121,7 +1141,7 @@ static void sra_hli(gameboy_t *gb)
 
 static void srl_r8(gameboy_t *gb, uint8_t opcode)
 {
-    uint8_t src = regmap(opcode);
+    uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
 
     gb->f = 0x00;
@@ -1200,6 +1220,7 @@ static void call_d16(gameboy_t *gb)
 
 static void call_cc_d16(gameboy_t *gb, uint8_t opcode)
 {
+    // Address is always read (and therefore PC is increased)
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
 
     if (check_condition(gb, opcode))
@@ -1233,6 +1254,7 @@ static void jp_d16(gameboy_t *gb)
 
 static void jp_cc_d16(gameboy_t *gb, uint8_t opcode)
 {
+    // Address is always read (and therefore PC is increased)
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
 
     if (check_condition(gb, opcode))
@@ -1257,6 +1279,7 @@ static void jr_d8(gameboy_t *gb)
 
 static void jr_cc_d8(gameboy_t *gb, uint8_t opcode)
 {
+    // Address offset is always read (and therefore PC is increased)
     int8_t offset = mem_read_byte(gb, gb->pc++);
 
     if (check_condition(gb, opcode))
@@ -1273,10 +1296,10 @@ static void jr_cc_d8(gameboy_t *gb, uint8_t opcode)
 
 static void ret_cc(gameboy_t *gb, uint8_t opcode)
 {
-    uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
-
     if (check_condition(gb, opcode))
     {
+        // SP is only increased if condition is met
+        uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
         gb->pc = addr;
 
         gb->m_cycles += 5;
@@ -1304,7 +1327,7 @@ static void reti(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void rst(gameboy_t *gb, uint8_t opcode)
+static void rst_vec(gameboy_t *gb, uint8_t opcode)
 {
     mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
     mem_write_byte(gb, --gb->sp, (gb->pc) & 0xFF);
@@ -1337,7 +1360,7 @@ static void pop_r16(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for POP r16", opcode);
+        printf("Unsupported opcode 0x%02X for POP r16\n", opcode);
         assert(!"Unsupported opcode for POP r16");
         break;
     }
@@ -1367,7 +1390,7 @@ static void push_r16(gameboy_t *gb, uint8_t opcode)
         break;
 
     default:
-        printf("Unsupported opcode %02X for PUSH r16", opcode);
+        printf("Unsupported opcode 0x%02X for PUSH r16\n", opcode);
         assert(!"Unsupported opcode for PUSH r16");
         break;
     }
@@ -1397,7 +1420,7 @@ static void cpl(gameboy_t *gb)
 
 static void daa(gameboy_t *gb)
 {
-    uint8_t result = gb->a;
+    uint16_t result = gb->a;
 
     if (gb->f & n)
     {
@@ -1411,22 +1434,22 @@ static void daa(gameboy_t *gb)
     else
     {
         // Addition
-        if ((gb->f & c) || result > 0x99)
+        if ((gb->f & c) || (result > 0x9F))
         {
             result += 0x60;
             // TODO: Check if c-flag handling is correct
             gb->f |= c;
         }
 
-        if ((gb->f & h) || (result & 0x0F) > 0x9)
+        if ((gb->f & h) || ((result & 0x0F) > 0x9))
             result += 0x06;
     }
 
-    if (result == 0)
+    if ((result & 0xFF) == 0)
         gb->f |= z;
 
-    gb->f &= h;
-    gb->a = result;
+    gb->f &= ~h;
+    gb->a = result & 0xFF;
 
     gb->m_cycles += 1;
 }
@@ -1481,7 +1504,7 @@ static void stop(gameboy_t *gb)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode
  */
-void execute_opcode(gameboy_t *gb, uint8_t opcode)
+static void execute_opcode(gameboy_t *gb, uint8_t opcode)
 {
     switch (opcode)
     {
@@ -1492,13 +1515,13 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
     }
 
     // Load Instructions
+    case OP_LD_A_u8:
     case OP_LD_B_u8:
     case OP_LD_C_u8:
     case OP_LD_D_u8:
     case OP_LD_E_u8:
     case OP_LD_H_u8:
     case OP_LD_L_u8:
-    case OP_LD_A_u8:
     {
         ld_r8_d8(gb, opcode);
         break;
@@ -1513,48 +1536,55 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
         break;
     }
 
+    case OP_LD_A_A:
+    case OP_LD_A_B:
+    case OP_LD_A_C:
+    case OP_LD_A_D:
+    case OP_LD_A_E:
+    case OP_LD_A_H:
+    case OP_LD_A_L:
+    case OP_LD_B_A:
     case OP_LD_B_B:
     case OP_LD_B_C:
     case OP_LD_B_D:
     case OP_LD_B_E:
     case OP_LD_B_H:
     case OP_LD_B_L:
-    case OP_LD_B_A:
+    case OP_LD_C_A:
     case OP_LD_C_B:
     case OP_LD_C_C:
     case OP_LD_C_D:
     case OP_LD_C_E:
     case OP_LD_C_H:
     case OP_LD_C_L:
-    case OP_LD_C_A:
+    case OP_LD_D_A:
     case OP_LD_D_B:
     case OP_LD_D_C:
     case OP_LD_D_D:
     case OP_LD_D_E:
     case OP_LD_D_H:
     case OP_LD_D_L:
-    case OP_LD_D_A:
+    case OP_LD_E_A:
     case OP_LD_E_B:
     case OP_LD_E_C:
     case OP_LD_E_D:
     case OP_LD_E_E:
     case OP_LD_E_H:
     case OP_LD_E_L:
-    case OP_LD_E_A:
+    case OP_LD_H_A:
     case OP_LD_H_B:
     case OP_LD_H_C:
     case OP_LD_H_D:
     case OP_LD_H_E:
     case OP_LD_H_H:
     case OP_LD_H_L:
-    case OP_LD_H_A:
+    case OP_LD_L_A:
     case OP_LD_L_B:
     case OP_LD_L_C:
     case OP_LD_L_D:
     case OP_LD_L_E:
     case OP_LD_L_H:
     case OP_LD_L_L:
-    case OP_LD_L_A:
     {
         ld_r8_r8(gb, opcode);
         break;
@@ -1592,6 +1622,12 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
     case OP_LD_DEi_A:
     {
         ld_r16i_a(gb, opcode);
+        break;
+    }
+
+    case OP_LD_u16i_A:
+    {
+        ld_d16i_a(gb);
         break;
     }
 
@@ -1709,11 +1745,343 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
         break;
     }
 
-        // ...
+    case OP_AND_A_A:
+    case OP_AND_A_B:
+    case OP_AND_A_C:
+    case OP_AND_A_D:
+    case OP_AND_A_E:
+    case OP_AND_A_H:
+    case OP_AND_A_L:
+    case OP_AND_A_HLi:
+    {
+        and_a_r8(gb, opcode);
+        break;
+    }
+
+    case OP_AND_A_u8:
+    {
+        and_a_d8(gb);
+        break;
+    }
+
+    case OP_CP_A_A:
+    case OP_CP_A_B:
+    case OP_CP_A_C:
+    case OP_CP_A_D:
+    case OP_CP_A_E:
+    case OP_CP_A_H:
+    case OP_CP_A_L:
+    case OP_CP_A_HLi:
+    {
+        cp_a_r8(gb, opcode);
+        break;
+    }
+
+    case OP_CP_A_u8:
+    {
+        cp_a_d8(gb);
+        break;
+    }
+
+    case OP_DEC_A:
+    case OP_DEC_B:
+    case OP_DEC_C:
+    case OP_DEC_D:
+    case OP_DEC_E:
+    case OP_DEC_H:
+    case OP_DEC_L:
+    {
+        dec_r8(gb, opcode);
+        break;
+    }
+
+    case OP_DEC_HLi:
+    {
+        dec_hli(gb);
+        break;
+    }
+
+    case OP_INC_A:
+    case OP_INC_B:
+    case OP_INC_C:
+    case OP_INC_D:
+    case OP_INC_E:
+    case OP_INC_H:
+    case OP_INC_L:
+    {
+        inc_r8(gb, opcode);
+        break;
+    }
+
+    case OP_INC_HLi:
+    {
+        inc_hli(gb);
+        break;
+    }
+
+    case OP_OR_A_A:
+    case OP_OR_A_B:
+    case OP_OR_A_C:
+    case OP_OR_A_D:
+    case OP_OR_A_E:
+    case OP_OR_A_H:
+    case OP_OR_A_L:
+    case OP_OR_A_HLi:
+    {
+        or_a_r8(gb, opcode);
+        break;
+    }
+
+    case OP_OR_A_u8:
+    {
+        or_a_d8(gb);
+        break;
+    }
+
+    case OP_SUB_A_A:
+    case OP_SUB_A_B:
+    case OP_SUB_A_C:
+    case OP_SUB_A_D:
+    case OP_SUB_A_E:
+    case OP_SUB_A_H:
+    case OP_SUB_A_L:
+    case OP_SUB_A_HLi:
+    case OP_SBC_A_A:
+    case OP_SBC_A_B:
+    case OP_SBC_A_C:
+    case OP_SBC_A_D:
+    case OP_SBC_A_E:
+    case OP_SBC_A_H:
+    case OP_SBC_A_L:
+    case OP_SBC_A_HLi:
+    {
+        subc_a_r8(gb, opcode);
+        break;
+    }
+
+    case OP_SUB_A_u8:
+    case OP_SBC_A_u8:
+    {
+        subc_a_d8(gb, opcode);
+        break;
+    }
+
+    case OP_XOR_A_A:
+    case OP_XOR_A_B:
+    case OP_XOR_A_C:
+    case OP_XOR_A_D:
+    case OP_XOR_A_E:
+    case OP_XOR_A_H:
+    case OP_XOR_A_L:
+    case OP_XOR_A_HLi:
+    {
+        xor_a_r8(gb, opcode);
+        break;
+    }
+
+    case OP_XOR_A_u8:
+    {
+        xor_a_d8(gb);
+        break;
+    }
+
+    case OP_RRA:
+    {
+        rr_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RRCA:
+    {
+        rrc_r8(gb, opcode);
+        break;
+    }
+
+    // 16-bit Arithmetic Instructions
+    case OP_ADD_HL_BC:
+    case OP_ADD_HL_DE:
+    case OP_ADD_HL_HL:
+    case OP_ADD_HL_SP:
+    {
+        add_hl_r16(gb, opcode);
+        break;
+    }
+
+    case OP_DEC_BC:
+    case OP_DEC_DE:
+    case OP_DEC_HL:
+    case OP_DEC_SP:
+    {
+        dec_r16(gb, opcode);
+        break;
+    }
+
+    case OP_INC_BC:
+    case OP_INC_DE:
+    case OP_INC_HL:
+    case OP_INC_SP:
+    {
+        inc_r16(gb, opcode);
+        break;
+    }
+
+    // Jumps and Subroutines
+    case OP_CALL_u16:
+    {
+        call_d16(gb);
+        break;
+    }
+
+    case OP_CALL_C_u16:
+    case OP_CALL_Z_u16:
+    case OP_CALL_NC_u16:
+    case OP_CALL_NZ_u16:
+    {
+        call_cc_d16(gb, opcode);
+        break;
+    }
+
+    case OP_JP_HL:
+    {
+        jp_hl(gb);
+        break;
+    }
+
+    case OP_JP_u16:
+    {
+        jp_d16(gb);
+        break;
+    }
+
+    case OP_JP_C_u16:
+    case OP_JP_Z_u16:
+    case OP_JP_NC_u16:
+    case OP_JP_NZ_u16:
+    {
+        jp_cc_d16(gb, opcode);
+        break;
+    }
+
+    case OP_JR_i8:
+    {
+        jr_d8(gb);
+        break;
+    }
+
+    case OP_JR_C_i8:
+    case OP_JR_Z_i8:
+    case OP_JR_NC_i8:
+    case OP_JR_NZ_i8:
+    {
+        jr_cc_d8(gb, opcode);
+        break;
+    }
+
+    case OP_RET_C:
+    case OP_RET_Z:
+    case OP_RET_NC:
+    case OP_RET_NZ:
+    {
+        ret_cc(gb, opcode);
+        break;
+    }
+
+    case OP_RET:
+    {
+        ret(gb);
+        break;
+    }
+
+    case OP_RETI:
+    {
+        reti(gb);
+        break;
+    }
+
+    case OP_RST_00h:
+    case OP_RST_08h:
+    case OP_RST_10h:
+    case OP_RST_18h:
+    case OP_RST_20h:
+    case OP_RST_28h:
+    case OP_RST_30h:
+    case OP_RST_38h:
+    {
+        rst_vec(gb, opcode);
+        break;
+    }
+
+    // Stack Operation Instructions
+    case OP_POP_AF:
+    case OP_POP_BC:
+    case OP_POP_DE:
+    case OP_POP_HL:
+    {
+        pop_r16(gb, opcode);
+        break;
+    }
+
+    case OP_PUSH_AF:
+    case OP_PUSH_BC:
+    case OP_PUSH_DE:
+    case OP_PUSH_HL:
+    {
+        push_r16(gb, opcode);
+        break;
+    }
+
+    // Miscellaneous Instructions
+    case OP_CCF:
+    {
+        ccf(gb);
+        break;
+    }
+
+    case OP_CPL:
+    {
+        cpl(gb);
+        break;
+    }
+
+    case OP_DAA:
+    {
+        daa(gb);
+        break;
+    }
+
+    case OP_DI:
+    {
+        di(gb);
+        break;
+    }
+
+    case OP_EI:
+    {
+        ei(gb);
+        break;
+    }
+
+    case OP_HALT:
+    {
+        halt(gb);
+        break;
+    }
+
+    case OP_SCF:
+    {
+        scf(gb);
+        break;
+    }
+
+    case OP_STOP:
+    {
+        stop(gb);
+        break;
+    }
 
     default:
     {
-        printf("Unhandled opcode: %02X", opcode);
+        printf("Unhandled opcode: 0x%02X\n", opcode);
         assert(!"Unhandled opcode");
         break;
     }
@@ -1728,6 +2096,411 @@ void execute_opcode(gameboy_t *gb, uint8_t opcode)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode (without the CB prefix)
  */
-void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
+static void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
 {
+    switch (opcode)
+    {
+    // Bit Operation Instructions
+    case OP_BIT_0_A:
+    case OP_BIT_0_B:
+    case OP_BIT_0_C:
+    case OP_BIT_0_D:
+    case OP_BIT_0_E:
+    case OP_BIT_0_H:
+    case OP_BIT_0_L:
+    case OP_BIT_0_HLi:
+    case OP_BIT_1_A:
+    case OP_BIT_1_B:
+    case OP_BIT_1_C:
+    case OP_BIT_1_D:
+    case OP_BIT_1_E:
+    case OP_BIT_1_H:
+    case OP_BIT_1_L:
+    case OP_BIT_1_HLi:
+    case OP_BIT_2_A:
+    case OP_BIT_2_B:
+    case OP_BIT_2_C:
+    case OP_BIT_2_D:
+    case OP_BIT_2_E:
+    case OP_BIT_2_H:
+    case OP_BIT_2_L:
+    case OP_BIT_2_HLi:
+    case OP_BIT_3_A:
+    case OP_BIT_3_B:
+    case OP_BIT_3_C:
+    case OP_BIT_3_D:
+    case OP_BIT_3_E:
+    case OP_BIT_3_H:
+    case OP_BIT_3_L:
+    case OP_BIT_3_HLi:
+    case OP_BIT_4_A:
+    case OP_BIT_4_B:
+    case OP_BIT_4_C:
+    case OP_BIT_4_D:
+    case OP_BIT_4_E:
+    case OP_BIT_4_H:
+    case OP_BIT_4_L:
+    case OP_BIT_4_HLi:
+    case OP_BIT_5_A:
+    case OP_BIT_5_B:
+    case OP_BIT_5_C:
+    case OP_BIT_5_D:
+    case OP_BIT_5_E:
+    case OP_BIT_5_H:
+    case OP_BIT_5_L:
+    case OP_BIT_5_HLi:
+    case OP_BIT_6_A:
+    case OP_BIT_6_B:
+    case OP_BIT_6_C:
+    case OP_BIT_6_D:
+    case OP_BIT_6_E:
+    case OP_BIT_6_H:
+    case OP_BIT_6_L:
+    case OP_BIT_6_HLi:
+    case OP_BIT_7_A:
+    case OP_BIT_7_B:
+    case OP_BIT_7_C:
+    case OP_BIT_7_D:
+    case OP_BIT_7_E:
+    case OP_BIT_7_H:
+    case OP_BIT_7_L:
+    case OP_BIT_7_HLi:
+    {
+        bit_u3_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RES_0_A:
+    case OP_RES_0_B:
+    case OP_RES_0_C:
+    case OP_RES_0_D:
+    case OP_RES_0_E:
+    case OP_RES_0_H:
+    case OP_RES_0_L:
+    case OP_RES_1_A:
+    case OP_RES_1_B:
+    case OP_RES_1_C:
+    case OP_RES_1_D:
+    case OP_RES_1_E:
+    case OP_RES_1_H:
+    case OP_RES_1_L:
+    case OP_RES_2_A:
+    case OP_RES_2_B:
+    case OP_RES_2_C:
+    case OP_RES_2_D:
+    case OP_RES_2_E:
+    case OP_RES_2_H:
+    case OP_RES_2_L:
+    case OP_RES_3_A:
+    case OP_RES_3_B:
+    case OP_RES_3_C:
+    case OP_RES_3_D:
+    case OP_RES_3_E:
+    case OP_RES_3_H:
+    case OP_RES_3_L:
+    case OP_RES_4_A:
+    case OP_RES_4_B:
+    case OP_RES_4_C:
+    case OP_RES_4_D:
+    case OP_RES_4_E:
+    case OP_RES_4_H:
+    case OP_RES_4_L:
+    case OP_RES_5_A:
+    case OP_RES_5_B:
+    case OP_RES_5_C:
+    case OP_RES_5_D:
+    case OP_RES_5_E:
+    case OP_RES_5_H:
+    case OP_RES_5_L:
+    case OP_RES_6_A:
+    case OP_RES_6_B:
+    case OP_RES_6_C:
+    case OP_RES_6_D:
+    case OP_RES_6_E:
+    case OP_RES_6_H:
+    case OP_RES_6_L:
+    case OP_RES_7_A:
+    case OP_RES_7_B:
+    case OP_RES_7_C:
+    case OP_RES_7_D:
+    case OP_RES_7_E:
+    case OP_RES_7_H:
+    case OP_RES_7_L:
+    {
+        res_u3_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RES_0_HLi:
+    case OP_RES_1_HLi:
+    case OP_RES_2_HLi:
+    case OP_RES_3_HLi:
+    case OP_RES_4_HLi:
+    case OP_RES_5_HLi:
+    case OP_RES_6_HLi:
+    case OP_RES_7_HLi:
+    {
+        res_u3_hli(gb, opcode);
+        break;
+    }
+
+    case OP_SET_0_A:
+    case OP_SET_0_B:
+    case OP_SET_0_C:
+    case OP_SET_0_D:
+    case OP_SET_0_E:
+    case OP_SET_0_H:
+    case OP_SET_0_L:
+    case OP_SET_1_A:
+    case OP_SET_1_B:
+    case OP_SET_1_C:
+    case OP_SET_1_D:
+    case OP_SET_1_E:
+    case OP_SET_1_H:
+    case OP_SET_1_L:
+    case OP_SET_2_A:
+    case OP_SET_2_B:
+    case OP_SET_2_C:
+    case OP_SET_2_D:
+    case OP_SET_2_E:
+    case OP_SET_2_H:
+    case OP_SET_2_L:
+    case OP_SET_3_A:
+    case OP_SET_3_B:
+    case OP_SET_3_C:
+    case OP_SET_3_D:
+    case OP_SET_3_E:
+    case OP_SET_3_H:
+    case OP_SET_3_L:
+    case OP_SET_4_A:
+    case OP_SET_4_B:
+    case OP_SET_4_C:
+    case OP_SET_4_D:
+    case OP_SET_4_E:
+    case OP_SET_4_H:
+    case OP_SET_4_L:
+    case OP_SET_5_A:
+    case OP_SET_5_B:
+    case OP_SET_5_C:
+    case OP_SET_5_D:
+    case OP_SET_5_E:
+    case OP_SET_5_H:
+    case OP_SET_5_L:
+    case OP_SET_6_A:
+    case OP_SET_6_B:
+    case OP_SET_6_C:
+    case OP_SET_6_D:
+    case OP_SET_6_E:
+    case OP_SET_6_H:
+    case OP_SET_6_L:
+    case OP_SET_7_A:
+    case OP_SET_7_B:
+    case OP_SET_7_C:
+    case OP_SET_7_D:
+    case OP_SET_7_E:
+    case OP_SET_7_H:
+    case OP_SET_7_L:
+    {
+        set_u3_r8(gb, opcode);
+        break;
+    }
+
+    case OP_SET_0_HLi:
+    case OP_SET_1_HLi:
+    case OP_SET_2_HLi:
+    case OP_SET_3_HLi:
+    case OP_SET_4_HLi:
+    case OP_SET_5_HLi:
+    case OP_SET_6_HLi:
+    case OP_SET_7_HLi:
+    {
+        set_u3_hli(gb, opcode);
+        break;
+    }
+
+    case OP_SWAP_A:
+    case OP_SWAP_B:
+    case OP_SWAP_C:
+    case OP_SWAP_D:
+    case OP_SWAP_E:
+    case OP_SWAP_H:
+    case OP_SWAP_L:
+    {
+        swap_r8(gb, opcode);
+        break;
+    }
+
+    case OP_SWAP_HLi:
+    {
+        swap_hli(gb);
+        break;
+    }
+
+    case OP_RL_A:
+    case OP_RL_B:
+    case OP_RL_C:
+    case OP_RL_D:
+    case OP_RL_E:
+    case OP_RL_H:
+    case OP_RL_L:
+    {
+        rl_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RL_HLi:
+    {
+        rl_hli(gb);
+        break;
+    }
+
+    case OP_RLC_A:
+    case OP_RLC_B:
+    case OP_RLC_C:
+    case OP_RLC_D:
+    case OP_RLC_E:
+    case OP_RLC_H:
+    case OP_RLC_L:
+    {
+        rlc_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RLC_HLi:
+    {
+        rlc_hli(gb);
+        break;
+    }
+
+    case OP_RR_A:
+    case OP_RR_B:
+    case OP_RR_C:
+    case OP_RR_D:
+    case OP_RR_E:
+    case OP_RR_H:
+    case OP_RR_L:
+    {
+        rr_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RR_HLi:
+    {
+        rr_hli(gb);
+        break;
+    }
+
+    case OP_RRC_A:
+    case OP_RRC_B:
+    case OP_RRC_C:
+    case OP_RRC_D:
+    case OP_RRC_E:
+    case OP_RRC_H:
+    case OP_RRC_L:
+    {
+        rrc_r8(gb, opcode);
+        break;
+    }
+
+    case OP_RRC_HLi:
+    {
+        rrc_hli(gb);
+        break;
+    }
+
+    case OP_SLA_A:
+    case OP_SLA_B:
+    case OP_SLA_C:
+    case OP_SLA_D:
+    case OP_SLA_E:
+    case OP_SLA_H:
+    case OP_SLA_L:
+    {
+        sla_r8(gb, opcode);
+        break;
+    }
+
+    case OP_SLA_HLi:
+    {
+        sla_hli(gb);
+        break;
+    }
+
+    case OP_SRA_A:
+    case OP_SRA_B:
+    case OP_SRA_C:
+    case OP_SRA_D:
+    case OP_SRA_E:
+    case OP_SRA_H:
+    case OP_SRA_L:
+    {
+        sra_r8(gb, opcode);
+        break;
+    }
+
+    case OP_SRA_HLi:
+    {
+        sra_hli(gb);
+        break;
+    }
+
+    case OP_SRL_A:
+    case OP_SRL_B:
+    case OP_SRL_C:
+    case OP_SRL_D:
+    case OP_SRL_E:
+    case OP_SRL_H:
+    case OP_SRL_L:
+    {
+        srl_r8(gb, opcode);
+        break;
+    }
+
+    case OP_SRL_HLi:
+    {
+        srl_hli(gb);
+        break;
+    }
+
+    default:
+    {
+        printf("Unhandled 0xCB prefixed opcode: 0x%02X\n", opcode);
+        assert(!"Unhandled 0xCB prefixed opcode");
+        break;
+    }
+    }
+}
+
+/**
+ * @brief Run one cpu cycle
+ *
+ * @param gb pointer to the gameboy state struct
+ */
+void cpu_run(gameboy_t *gb)
+{
+    uint16_t current_cycles = gb->m_cycles;
+
+    if (gb->stopped)
+    {
+        return;
+    }
+
+    if (!gb->halted)
+    {
+        // We don't have to advance the cycles here because
+        // fetch and execute overlap (except for the first fetch, which we accept)
+        uint8_t opcode = mem_read_byte(gb, gb->pc++);
+
+        if (opcode == 0xCB)
+        {
+            opcode = mem_read_byte(gb, gb->pc++);
+            execute_cb_opcode(gb, opcode);
+        }
+        else
+        {
+            execute_opcode(gb, opcode);
+        }
+
+        uint16_t cycles_passed = gb->m_cycles - current_cycles;
+    }
 }
