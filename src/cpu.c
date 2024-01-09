@@ -2500,6 +2500,76 @@ static void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
 }
 
 /**
+ * @brief Internal interrupt service routine
+ *
+ * Interrupt service routine implementation for internal use
+ *
+ * @param gb gameboy state struct
+ * @param addr interrupt service routine address to jump to (CALL)
+ */
+static void cpu_isr(gameboy_t *gb, uint16_t addr)
+{
+    gb->ime = false;
+    nop(gb);
+    nop(gb);
+
+    mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
+    mem_write_byte(gb, --gb->sp, (gb->pc) & 0xFF);
+    gb->pc = addr;
+
+    gb->m_cycles += 3;
+}
+
+void cpu_handle_interrupts(gameboy_t *gb)
+{
+    if (gb->ime)
+    {
+        uint8_t ir_enable = mem_read_byte(gb, 0xFF00 + GB_IE);
+        uint8_t ir_flags = mem_read_byte(gb, 0xFF00 + GB_IF);
+        uint8_t ir_status = ir_enable & ir_flags;
+
+        if ((ir_status & IR_VBLANK))
+        {
+            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_VBLANK);
+            cpu_isr(gb, 0x40);
+            return;
+        }
+
+        if ((ir_status & IR_LCD))
+        {
+            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_LCD);
+            cpu_isr(gb, 0x48);
+            return;
+        }
+
+        if ((ir_status & IR_TIMER))
+        {
+            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_TIMER);
+            cpu_isr(gb, 0x50);
+            return;
+        }
+
+        if ((ir_status & IR_SERIAL))
+        {
+            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_SERIAL);
+            cpu_isr(gb, 0x58);
+            return;
+        }
+
+        if ((ir_status & IR_JOYPAD))
+        {
+            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_JOYPAD);
+            cpu_isr(gb, 0x60);
+            return;
+        }
+    }
+}
+
+void cpu_handle_timers(gameboy_t *gb, uint16_t cycles)
+{
+}
+
+/**
  * @brief Run one cpu cycle
  *
  * @param gb pointer to the gameboy state struct
@@ -2519,6 +2589,13 @@ void cpu_run(gameboy_t *gb)
         // fetch and execute overlap (except for the first fetch, which we accept)
         uint8_t opcode = mem_read_byte(gb, gb->pc++);
 
+        // IME is only enabled after one additional cycle
+        if (gb->ime_enable & !gb->ime)
+        {
+            gb->ime = true;
+            gb->ime_enable = false;
+        }
+
         if (opcode == 0xCB)
         {
             opcode = mem_read_byte(gb, gb->pc++);
@@ -2530,5 +2607,8 @@ void cpu_run(gameboy_t *gb)
         }
 
         uint16_t cycles_passed = gb->m_cycles - current_cycles;
+
+        cpu_handle_timers(gb, cycles_passed);
+        cpu_handle_interrupts(gb);
     }
 }
