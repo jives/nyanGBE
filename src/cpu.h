@@ -3,4 +3,4 @@
 #include <stdint.h>
 #include "gb.h"
 
-void cpu_run(gameboy_t *gb);
+void cpu_run(struct gb_s *gb);

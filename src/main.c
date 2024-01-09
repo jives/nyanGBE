@@ -21,7 +21,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    gameboy_t gb;
+    struct gb_s gb;
     char *rom_path = argv[1];
 
     gb_init(&gb);
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     signal(SIGINT, sig_handler);
     while (keep_running)
     {
-        gb_log_state(&gb, log_file, true);
+        gb_log_state(&gb, log_file, false);
         cpu_run(&gb);
 
         if (mem_read_byte(&gb, 0xFF02) == 0x81)

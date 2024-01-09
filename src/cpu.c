@@ -65,7 +65,7 @@ static inline uint8_t regmap(uint8_t regnum)
  * @param opcode gameboy opcode
  * @return uint8_t register value (memory value for (HL))
  */
-static uint8_t read_opcode_reg(gameboy_t *gb, uint8_t opcode)
+static uint8_t read_opcode_reg(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = opcode & 0b111;
     if (src != 6)
@@ -90,13 +90,13 @@ static uint8_t read_opcode_reg(gameboy_t *gb, uint8_t opcode)
  * cc: condition code (z, nz, c, nc)
  */
 
-static void nop(gameboy_t *gb)
+static void nop(struct gb_s *gb)
 {
     gb->m_cycles += 1;
 }
 
 // Load Instructions
-static void ld_r8_r8(gameboy_t *gb, uint8_t opcode)
+static void ld_r8_r8(struct gb_s *gb, uint8_t opcode)
 {
     // May be more performant if we don't decode the register numbers
     // Generate functions using macros?
@@ -106,14 +106,14 @@ static void ld_r8_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void ld_r8_d8(gameboy_t *gb, uint8_t opcode)
+static void ld_r8_d8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode >> 3) & 0b111);
     gb->registers[dst] = mem_read_byte(gb, gb->pc++);
     gb->m_cycles += 2;
 }
 
-static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
+static void ld_r16_d16(struct gb_s *gb, uint8_t opcode)
 {
     uint16_t data = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
 
@@ -141,28 +141,28 @@ static void ld_r16_d16(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 3;
 }
 
-static void ld_hli_r8(gameboy_t *gb, uint8_t opcode)
+static void ld_hli_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     mem_write_byte(gb, gb->hl, gb->registers[src]);
     gb->m_cycles += 2;
 }
 
-static void ld_hli_d8(gameboy_t *gb)
+static void ld_hli_d8(struct gb_s *gb)
 {
     uint8_t data = mem_read_byte(gb, gb->pc++);
     mem_write_byte(gb, gb->hl, data);
     gb->m_cycles += 3;
 }
 
-static void ld_r8_hli(gameboy_t *gb, uint8_t opcode)
+static void ld_r8_hli(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode >> 3) & 0b111);
     gb->registers[dst] = mem_read_byte(gb, gb->hl);
     gb->m_cycles += 2;
 }
 
-static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
+static void ld_r16i_a(struct gb_s *gb, uint8_t opcode)
 {
     uint16_t dst;
 
@@ -185,7 +185,7 @@ static void ld_r16i_a(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void ld_d16i_a(gameboy_t *gb)
+static void ld_d16i_a(struct gb_s *gb)
 {
     uint8_t src_lo = mem_read_byte(gb, gb->pc++);
     uint8_t src_hi = mem_read_byte(gb, gb->pc++);
@@ -193,20 +193,20 @@ static void ld_d16i_a(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void ldh_d16i_a(gameboy_t *gb)
+static void ldh_d16i_a(struct gb_s *gb)
 {
     uint8_t src_lo = mem_read_byte(gb, gb->pc++);
     mem_write_byte(gb, 0xFF00 + src_lo, gb->a);
     gb->m_cycles += 3;
 }
 
-static void ldh_ci_a(gameboy_t *gb)
+static void ldh_ci_a(struct gb_s *gb)
 {
     mem_write_byte(gb, 0xFF00 + gb->c, gb->a);
     gb->m_cycles += 2;
 }
 
-static void ld_a_r16i(gameboy_t *gb, uint8_t opcode)
+static void ld_a_r16i(struct gb_s *gb, uint8_t opcode)
 {
     uint16_t src;
 
@@ -229,7 +229,7 @@ static void ld_a_r16i(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void ld_a_d16i(gameboy_t *gb)
+static void ld_a_d16i(struct gb_s *gb)
 {
     uint8_t src_lo = mem_read_byte(gb, gb->pc++);
     uint8_t src_hi = mem_read_byte(gb, gb->pc++);
@@ -237,55 +237,55 @@ static void ld_a_d16i(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void ldh_a_d16i(gameboy_t *gb)
+static void ldh_a_d16i(struct gb_s *gb)
 {
     uint8_t src_lo = mem_read_byte(gb, gb->pc++);
     gb->a = mem_read_byte(gb, 0xFF00 + src_lo);
     gb->m_cycles += 3;
 }
 
-static void ldh_a_ci(gameboy_t *gb)
+static void ldh_a_ci(struct gb_s *gb)
 {
     gb->a = mem_read_byte(gb, 0xFF00 + gb->c);
     gb->m_cycles += 2;
 }
 
-static void ld_hlpi_a(gameboy_t *gb)
+static void ld_hlpi_a(struct gb_s *gb)
 {
     mem_write_byte(gb, gb->hl, gb->a);
     gb->hl++;
     gb->m_cycles += 2;
 }
 
-static void ld_hlmi_a(gameboy_t *gb)
+static void ld_hlmi_a(struct gb_s *gb)
 {
     mem_write_byte(gb, gb->hl, gb->a);
     gb->hl--;
     gb->m_cycles += 2;
 }
 
-static void ld_a_hlpi(gameboy_t *gb)
+static void ld_a_hlpi(struct gb_s *gb)
 {
     gb->a = mem_read_byte(gb, gb->hl);
     gb->hl++;
     gb->m_cycles += 2;
 }
 
-static void ld_a_hlmi(gameboy_t *gb)
+static void ld_a_hlmi(struct gb_s *gb)
 {
     gb->a = mem_read_byte(gb, gb->hl);
     gb->hl--;
     gb->m_cycles += 2;
 }
 
-static void ld_sp_d16(gameboy_t *gb)
+static void ld_sp_d16(struct gb_s *gb)
 {
     // Note: This is covered by the OP_LD_SP_u16 case of ld_r16_d16() already
     gb->sp = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
     gb->m_cycles += 3;
 }
 
-static void ld_d16_sp(gameboy_t *gb)
+static void ld_d16_sp(struct gb_s *gb)
 {
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
     mem_write_byte(gb, addr, gb->sp & 0xFF);
@@ -293,7 +293,7 @@ static void ld_d16_sp(gameboy_t *gb)
     gb->m_cycles += 5;
 }
 
-static void ld_hl_sp_i8(gameboy_t *gb)
+static void ld_hl_sp_i8(struct gb_s *gb)
 {
     int16_t offset;
     offset = (int16_t)mem_read_byte(gb, gb->pc++);
@@ -313,7 +313,7 @@ static void ld_hl_sp_i8(gameboy_t *gb)
     gb->m_cycles += 3;
 }
 
-static void ld_sp_hl(gameboy_t *gb)
+static void ld_sp_hl(struct gb_s *gb)
 {
     gb->sp = gb->hl;
     gb->m_cycles += 2;
@@ -331,7 +331,7 @@ static void ld_sp_hl(gameboy_t *gb)
  * @param value the value to add to register a
  * @param carry carry value (0/1) to add to register a
  */
-static void adc_internal(gameboy_t *gb, uint8_t value, uint8_t carry)
+static void adc_internal(struct gb_s *gb, uint8_t value, uint8_t carry)
 {
     uint8_t a = gb->a;
 
@@ -363,7 +363,7 @@ static void adc_internal(gameboy_t *gb, uint8_t value, uint8_t carry)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode
  */
-static void addc_a_r8(gameboy_t *gb, uint8_t opcode)
+static void addc_a_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t value = read_opcode_reg(gb, opcode);
     uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
@@ -381,7 +381,7 @@ static void addc_a_r8(gameboy_t *gb, uint8_t opcode)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode
  */
-static void addc_a_d8(gameboy_t *gb, uint8_t opcode)
+static void addc_a_d8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
     uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
@@ -391,7 +391,7 @@ static void addc_a_d8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void add_sp_i8(gameboy_t *gb)
+static void add_sp_i8(struct gb_s *gb)
 {
     int8_t value = mem_read_byte(gb, gb->pc++);
     uint8_t sp = gb->sp;
@@ -411,7 +411,7 @@ static void add_sp_i8(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void and_a_r8(gameboy_t *gb, uint8_t opcode)
+static void and_a_r8(struct gb_s *gb, uint8_t opcode)
 {
     int8_t value = read_opcode_reg(gb, opcode);
     gb->a &= value;
@@ -426,7 +426,7 @@ static void and_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void and_a_d8(gameboy_t *gb)
+static void and_a_d8(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->a &= value;
@@ -441,7 +441,7 @@ static void and_a_d8(gameboy_t *gb)
     gb->m_cycles += 2;
 }
 
-static void cp_a_r8(gameboy_t *gb, uint8_t opcode)
+static void cp_a_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t value = read_opcode_reg(gb, opcode);
     gb->f = 0x00;
@@ -465,7 +465,7 @@ static void cp_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void cp_a_d8(gameboy_t *gb)
+static void cp_a_d8(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->f = 0x00;
@@ -489,7 +489,7 @@ static void cp_a_d8(gameboy_t *gb)
     gb->m_cycles += 2;
 }
 
-static void dec_r8(gameboy_t *gb, uint8_t opcode)
+static void dec_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode - OP_DEC_B) >> 3);
     uint8_t value = gb->registers[dst]--;
@@ -510,7 +510,7 @@ static void dec_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void dec_hli(gameboy_t *gb)
+static void dec_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, value - 1);
@@ -531,7 +531,7 @@ static void dec_hli(gameboy_t *gb)
     gb->m_cycles += 3;
 }
 
-static void inc_r8(gameboy_t *gb, uint8_t opcode)
+static void inc_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t dst = regmap((opcode - OP_INC_B) >> 3);
     uint8_t value = gb->registers[dst]++;
@@ -550,7 +550,7 @@ static void inc_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void inc_hli(gameboy_t *gb)
+static void inc_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, value + 1);
@@ -570,7 +570,7 @@ static void inc_hli(gameboy_t *gb)
     gb->m_cycles += 3;
 }
 
-static void or_a_r8(gameboy_t *gb, uint8_t opcode)
+static void or_a_r8(struct gb_s *gb, uint8_t opcode)
 {
     int8_t value = read_opcode_reg(gb, opcode);
     gb->a |= value;
@@ -584,7 +584,7 @@ static void or_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void or_a_d8(gameboy_t *gb)
+static void or_a_d8(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->a |= value;
@@ -608,7 +608,7 @@ static void or_a_d8(gameboy_t *gb)
  * @param value the value to subtract from register a
  * @param carry carry value (0/1) to subtract from register a
  */
-static void sbc_internal(gameboy_t *gb, uint8_t value, uint8_t carry)
+static void sbc_internal(struct gb_s *gb, uint8_t value, uint8_t carry)
 {
     uint8_t a = gb->a;
 
@@ -641,7 +641,7 @@ static void sbc_internal(gameboy_t *gb, uint8_t value, uint8_t carry)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode
  */
-static void subc_a_r8(gameboy_t *gb, uint8_t opcode)
+static void subc_a_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t value = read_opcode_reg(gb, opcode);
     uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
@@ -651,7 +651,7 @@ static void subc_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void subc_a_d8(gameboy_t *gb, uint8_t opcode)
+static void subc_a_d8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
     uint8_t carry = (gb->f & c) != 0 && opcode & 0x08;
@@ -661,7 +661,7 @@ static void subc_a_d8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void xor_a_r8(gameboy_t *gb, uint8_t opcode)
+static void xor_a_r8(struct gb_s *gb, uint8_t opcode)
 {
     int8_t value = read_opcode_reg(gb, opcode);
     gb->a ^= value;
@@ -675,7 +675,7 @@ static void xor_a_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 1;
 }
 
-static void xor_a_d8(gameboy_t *gb)
+static void xor_a_d8(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->pc++);
     gb->a ^= value;
@@ -691,7 +691,7 @@ static void xor_a_d8(gameboy_t *gb)
 
 // 16-bit Arithmetic Instructions
 // This incudes ADD HL,SP
-static void add_hl_r16(gameboy_t *gb, uint8_t opcode)
+static void add_hl_r16(struct gb_s *gb, uint8_t opcode)
 {
     uint16_t value;
     uint16_t hl = gb->hl;
@@ -733,7 +733,7 @@ static void add_hl_r16(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void dec_r16(gameboy_t *gb, uint8_t opcode)
+static void dec_r16(struct gb_s *gb, uint8_t opcode)
 {
     switch (opcode)
     {
@@ -759,7 +759,7 @@ static void dec_r16(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void inc_r16(gameboy_t *gb, uint8_t opcode)
+static void inc_r16(struct gb_s *gb, uint8_t opcode)
 {
     switch (opcode)
     {
@@ -786,7 +786,7 @@ static void inc_r16(gameboy_t *gb, uint8_t opcode)
 }
 
 // Bit Operation Instructions (OxCB prefixed)
-static void bit_u3_r8(gameboy_t *gb, uint8_t opcode)
+static void bit_u3_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_BIT_0_B) >> 3;
     uint8_t value = read_opcode_reg(gb, opcode);
@@ -801,7 +801,7 @@ static void bit_u3_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void res_u3_r8(gameboy_t *gb, uint8_t opcode)
+static void res_u3_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_RES_0_B) >> 3;
     uint8_t dst = regmap(opcode & 0b111);
@@ -810,7 +810,7 @@ static void res_u3_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void res_u3_hli(gameboy_t *gb, uint8_t opcode)
+static void res_u3_hli(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_RES_0_B) >> 3;
     uint8_t value = mem_read_byte(gb, gb->hl);
@@ -819,7 +819,7 @@ static void res_u3_hli(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 4;
 }
 
-static void set_u3_r8(gameboy_t *gb, uint8_t opcode)
+static void set_u3_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_SET_0_B) >> 3;
     uint8_t dst = regmap(opcode & 0b111);
@@ -828,7 +828,7 @@ static void set_u3_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void set_u3_hli(gameboy_t *gb, uint8_t opcode)
+static void set_u3_hli(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t bit = (opcode - OP_SET_0_B) >> 3;
     uint8_t value = mem_read_byte(gb, gb->hl);
@@ -837,7 +837,7 @@ static void set_u3_hli(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 4;
 }
 
-static void swap_r8(gameboy_t *gb, uint8_t opcode)
+static void swap_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t dst = regmap(opcode & 0b111);
     uint8_t value = gb->registers[dst];
@@ -847,7 +847,7 @@ static void swap_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void swap_hli(gameboy_t *gb)
+static void swap_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, ((value >> 4) & 0x0F) | ((value << 4) & 0xF0));
@@ -856,7 +856,7 @@ static void swap_hli(gameboy_t *gb)
 }
 
 // Bit Shift Instructions (OxCB prefixed)
-static void rl_r8(gameboy_t *gb, uint8_t opcode)
+static void rl_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -887,7 +887,7 @@ static void rl_r8(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void rl_hli(gameboy_t *gb)
+static void rl_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (gb->f & c) != 0;
@@ -910,7 +910,7 @@ static void rl_hli(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void rlc_r8(gameboy_t *gb, uint8_t opcode)
+static void rlc_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -940,7 +940,7 @@ static void rlc_r8(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void rlc_hli(gameboy_t *gb)
+static void rlc_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (value & 0x80) != 0;
@@ -962,7 +962,7 @@ static void rlc_hli(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void rr_r8(gameboy_t *gb, uint8_t opcode)
+static void rr_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -992,7 +992,7 @@ static void rr_r8(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void rr_hli(gameboy_t *gb)
+static void rr_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (gb->f & c) != 0;
@@ -1015,7 +1015,7 @@ static void rr_hli(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void rrc_r8(gameboy_t *gb, uint8_t opcode)
+static void rrc_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -1044,7 +1044,7 @@ static void rrc_r8(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void rrc_hli(gameboy_t *gb)
+static void rrc_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (value & 0x01) != 0;
@@ -1066,7 +1066,7 @@ static void rrc_hli(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void sla_r8(gameboy_t *gb, uint8_t opcode)
+static void sla_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -1088,7 +1088,7 @@ static void sla_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void sla_hli(gameboy_t *gb)
+static void sla_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t carry = (value & 0x80) != 0;
@@ -1110,7 +1110,7 @@ static void sla_hli(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void sra_r8(gameboy_t *gb, uint8_t opcode)
+static void sra_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -1132,7 +1132,7 @@ static void sra_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void sra_hli(gameboy_t *gb)
+static void sra_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     uint8_t b7 = (value & 0x80);
@@ -1155,7 +1155,7 @@ static void sra_hli(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void srl_r8(gameboy_t *gb, uint8_t opcode)
+static void srl_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -1176,7 +1176,7 @@ static void srl_r8(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 2;
 }
 
-static void srl_hli(gameboy_t *gb)
+static void srl_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
 
@@ -1207,7 +1207,7 @@ static void srl_hli(gameboy_t *gb)
  * @return true if the condition is met
  * @return false otherwise
  */
-static bool check_condition(gameboy_t *gb, uint8_t opcode)
+static bool check_condition(struct gb_s *gb, uint8_t opcode)
 {
     switch ((opcode >> 3) & 0x3)
     {
@@ -1224,7 +1224,7 @@ static bool check_condition(gameboy_t *gb, uint8_t opcode)
     return false;
 }
 
-static void call_d16(gameboy_t *gb)
+static void call_d16(struct gb_s *gb)
 {
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
     mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
@@ -1234,7 +1234,7 @@ static void call_d16(gameboy_t *gb)
     gb->m_cycles += 6;
 }
 
-static void call_cc_d16(gameboy_t *gb, uint8_t opcode)
+static void call_cc_d16(struct gb_s *gb, uint8_t opcode)
 {
     // Address is always read (and therefore PC is increased)
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
@@ -1253,14 +1253,14 @@ static void call_cc_d16(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void jp_hl(gameboy_t *gb)
+static void jp_hl(struct gb_s *gb)
 {
     gb->pc = gb->hl;
 
     gb->m_cycles += 1;
 }
 
-static void jp_d16(gameboy_t *gb)
+static void jp_d16(struct gb_s *gb)
 {
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
     gb->pc = addr;
@@ -1268,7 +1268,7 @@ static void jp_d16(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void jp_cc_d16(gameboy_t *gb, uint8_t opcode)
+static void jp_cc_d16(struct gb_s *gb, uint8_t opcode)
 {
     // Address is always read (and therefore PC is increased)
     uint16_t addr = mem_read_byte(gb, gb->pc++) + (mem_read_byte(gb, gb->pc++) << 8);
@@ -1285,7 +1285,7 @@ static void jp_cc_d16(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void jr_d8(gameboy_t *gb)
+static void jr_d8(struct gb_s *gb)
 {
     int8_t offset = mem_read_byte(gb, gb->pc++);
     gb->pc += offset;
@@ -1293,7 +1293,7 @@ static void jr_d8(gameboy_t *gb)
     gb->m_cycles += 3;
 }
 
-static void jr_cc_d8(gameboy_t *gb, uint8_t opcode)
+static void jr_cc_d8(struct gb_s *gb, uint8_t opcode)
 {
     // Address offset is always read (and therefore PC is increased)
     int8_t offset = mem_read_byte(gb, gb->pc++);
@@ -1310,7 +1310,7 @@ static void jr_cc_d8(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void ret_cc(gameboy_t *gb, uint8_t opcode)
+static void ret_cc(struct gb_s *gb, uint8_t opcode)
 {
     if (check_condition(gb, opcode))
     {
@@ -1326,7 +1326,7 @@ static void ret_cc(gameboy_t *gb, uint8_t opcode)
     }
 }
 
-static void ret(gameboy_t *gb)
+static void ret(struct gb_s *gb)
 {
     uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
     gb->pc = addr;
@@ -1334,7 +1334,7 @@ static void ret(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void reti(gameboy_t *gb)
+static void reti(struct gb_s *gb)
 {
     uint16_t addr = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
     gb->pc = addr;
@@ -1343,7 +1343,7 @@ static void reti(gameboy_t *gb)
     gb->m_cycles += 4;
 }
 
-static void rst_vec(gameboy_t *gb, uint8_t opcode)
+static void rst_vec(struct gb_s *gb, uint8_t opcode)
 {
     mem_write_byte(gb, --gb->sp, (gb->pc) >> 8);
     mem_write_byte(gb, --gb->sp, (gb->pc) & 0xFF);
@@ -1356,7 +1356,7 @@ static void rst_vec(gameboy_t *gb, uint8_t opcode)
 
 // ADD, DEC, INC, LD stack pointer all implemented in their respective sections
 
-static void pop_r16(gameboy_t *gb, uint8_t opcode)
+static void pop_r16(struct gb_s *gb, uint8_t opcode)
 {
     uint16_t value = mem_read_byte(gb, gb->sp++) + (mem_read_byte(gb, gb->sp++) << 8);
 
@@ -1384,7 +1384,7 @@ static void pop_r16(gameboy_t *gb, uint8_t opcode)
     gb->m_cycles += 3;
 }
 
-static void push_r16(gameboy_t *gb, uint8_t opcode)
+static void push_r16(struct gb_s *gb, uint8_t opcode)
 {
     switch (opcode)
     {
@@ -1415,7 +1415,7 @@ static void push_r16(gameboy_t *gb, uint8_t opcode)
 }
 
 // Miscellaneous Instructions
-static void ccf(gameboy_t *gb)
+static void ccf(struct gb_s *gb)
 {
     gb->f &= ~n;
     gb->f &= ~h;
@@ -1424,7 +1424,7 @@ static void ccf(gameboy_t *gb)
     gb->m_cycles += 1;
 }
 
-static void cpl(gameboy_t *gb)
+static void cpl(struct gb_s *gb)
 {
     uint8_t value = gb->a;
     gb->a = ~value;
@@ -1434,7 +1434,7 @@ static void cpl(gameboy_t *gb)
     gb->m_cycles += 1;
 }
 
-static void daa(gameboy_t *gb)
+static void daa(struct gb_s *gb)
 {
     uint16_t result = gb->a;
     gb->f &= ~z;
@@ -1470,14 +1470,14 @@ static void daa(gameboy_t *gb)
     gb->m_cycles += 1;
 }
 
-static void di(gameboy_t *gb)
+static void di(struct gb_s *gb)
 {
     gb->ime = false;
 
     gb->m_cycles += 1;
 }
 
-static void ei(gameboy_t *gb)
+static void ei(struct gb_s *gb)
 {
     // EI actually enables interrupts after one additional cycle
     gb->ime_enable = true;
@@ -1485,7 +1485,7 @@ static void ei(gameboy_t *gb)
     gb->m_cycles += 1;
 }
 
-static void halt(gameboy_t *gb)
+static void halt(struct gb_s *gb)
 {
     // TODO: Implement halt bug
     gb->halted = true;
@@ -1495,7 +1495,7 @@ static void halt(gameboy_t *gb)
 
 // NOP covered already above
 
-static void scf(gameboy_t *gb)
+static void scf(struct gb_s *gb)
 {
     gb->f &= ~n;
     gb->f &= ~h;
@@ -1504,7 +1504,7 @@ static void scf(gameboy_t *gb)
     gb->m_cycles += 1;
 }
 
-static void stop(gameboy_t *gb)
+static void stop(struct gb_s *gb)
 {
     // TODO: Extend behavior?
     gb->stopped = true;
@@ -1520,7 +1520,7 @@ static void stop(gameboy_t *gb)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode
  */
-static void execute_opcode(gameboy_t *gb, uint8_t opcode)
+static void execute_opcode(struct gb_s *gb, uint8_t opcode)
 {
     switch (opcode)
     {
@@ -2124,7 +2124,7 @@ static void execute_opcode(gameboy_t *gb, uint8_t opcode)
  * @param gb pointer to the gameboy state struct
  * @param opcode gameboy opcode (without the CB prefix)
  */
-static void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
+static void execute_cb_opcode(struct gb_s *gb, uint8_t opcode)
 {
     switch (opcode)
     {
@@ -2507,7 +2507,7 @@ static void execute_cb_opcode(gameboy_t *gb, uint8_t opcode)
  * @param gb gameboy state struct
  * @param addr interrupt service routine address to jump to (CALL)
  */
-static void cpu_isr(gameboy_t *gb, uint16_t addr)
+static void cpu_isr(struct gb_s *gb, uint16_t addr)
 {
     gb->ime = false;
     nop(gb);
@@ -2520,7 +2520,7 @@ static void cpu_isr(gameboy_t *gb, uint16_t addr)
     gb->m_cycles += 3;
 }
 
-void cpu_handle_interrupts(gameboy_t *gb)
+void cpu_handle_interrupts(struct gb_s *gb)
 {
     if (gb->ime)
     {
@@ -2565,8 +2565,15 @@ void cpu_handle_interrupts(gameboy_t *gb)
     }
 }
 
-void cpu_handle_timers(gameboy_t *gb, uint16_t cycles)
+void cpu_handle_timers(struct gb_s *gb, uint16_t cycles)
 {
+    static uint16_t div_cycles;
+
+    div_cycles += cycles;
+    if (div_cycles >= 256)
+    {
+        div_cycles = 0;
+    }
 }
 
 /**
@@ -2574,7 +2581,7 @@ void cpu_handle_timers(gameboy_t *gb, uint16_t cycles)
  *
  * @param gb pointer to the gameboy state struct
  */
-void cpu_run(gameboy_t *gb)
+void cpu_run(struct gb_s *gb)
 {
     uint16_t current_cycles = gb->m_cycles;
 

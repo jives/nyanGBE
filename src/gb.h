@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "memory.h"
 
 /* Constants */
 #define GB_NUM_REG_8_BIT 8
@@ -93,7 +94,7 @@ enum
 };
 
 /* Main GB state */
-typedef struct gb
+struct gb_s
 {
     union
     {
@@ -125,11 +126,10 @@ typedef struct gb
     bool ime_enable;
     bool halted;
     bool stopped;
-    uint8_t rom[0x8000];
-    uint8_t ram[0x8000];
-} gameboy_t;
+    struct memory_s memory;
+};
 
-void gb_init(gameboy_t *gb);
-void gb_run(gameboy_t *gb);
-int gb_load_rom(gameboy_t *gb, const char *path);
-void gb_log_state(gameboy_t *gb, FILE *log_file, bool gbdoc);
+void gb_init(struct gb_s *gb);
+void gb_run(struct gb_s *gb);
+int gb_load_rom(struct gb_s *gb, const char *path);
+void gb_log_state(struct gb_s *gb, FILE *log_file, bool gbdoc);

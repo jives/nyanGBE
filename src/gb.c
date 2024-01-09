@@ -7,7 +7,7 @@
 #include "gb.h"
 #include "memory.h"
 
-void gb_init(gameboy_t *gb)
+void gb_init(struct gb_s *gb)
 {
     gb->a = 0x01;
     gb->f = 0xB0;
@@ -22,11 +22,11 @@ void gb_init(gameboy_t *gb)
     gb->sp = 0xFFFE;
 }
 
-void gb_run(gameboy_t *gb)
+void gb_run(struct gb_s *gb)
 {
 }
 
-int gb_load_rom(gameboy_t *gb, const char *path)
+int gb_load_rom(struct gb_s *gb, const char *path)
 {
     FILE *f = fopen(path, "rb");
 
@@ -46,14 +46,14 @@ int gb_load_rom(gameboy_t *gb, const char *path)
         return -1;
     }
 
-    memset(gb->rom, 0xFF, 0x8000); /* Pad with 0xFFs */
-    fread(gb->rom, 1, rom_size, f);
+    memset(gb->memory.rom, 0xFF, 0x8000); /* Pad with 0xFFs */
+    fread(gb->memory.rom, 1, rom_size, f);
     fclose(f);
 
     return 0;
 }
 
-void gb_log_state(gameboy_t *gb, FILE *log_file, bool gbdoc)
+void gb_log_state(struct gb_s *gb, FILE *log_file, bool gbdoc)
 {
     if (gbdoc)
     {

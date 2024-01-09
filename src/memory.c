@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "gb.h"
 #include "memory.h"
 
 /**
@@ -12,11 +13,11 @@
  * @param loc 16-bit memory address to read from
  * @return uint8_t byte at memory address
  */
-uint8_t mem_read_byte(gameboy_t *gb, uint16_t loc)
+uint8_t mem_read_byte(struct gb_s *gb, uint16_t loc)
 {
     if (loc < 0x8000)
     {
-        return gb->rom[loc];
+        return gb->memory.rom[loc];
     }
     else if (loc == 0xFF44)
     {
@@ -26,7 +27,7 @@ uint8_t mem_read_byte(gameboy_t *gb, uint16_t loc)
     }
     else
     {
-        return gb->ram[loc - 0x8000];
+        return gb->memory.ram[loc - 0x8000];
     }
 }
 
@@ -39,11 +40,11 @@ uint8_t mem_read_byte(gameboy_t *gb, uint16_t loc)
  * @param loc 16-bit memory address to write to
  * @param data byte to write
  */
-void mem_write_byte(gameboy_t *gb, uint16_t loc, uint8_t data)
+void mem_write_byte(struct gb_s *gb, uint16_t loc, uint8_t data)
 {
     if (loc < 0x8000)
         // Protect ROM from writes
         return;
 
-    gb->ram[loc - 0x8000] = data;
+    gb->memory.ram[loc - 0x8000] = data;
 }
