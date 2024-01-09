@@ -296,7 +296,7 @@ static void ld_d16_sp(struct gb_s *gb)
 static void ld_hl_sp_i8(struct gb_s *gb)
 {
     int16_t offset;
-    offset = (int16_t)mem_read_byte(gb, gb->pc++);
+    offset = (int8_t)mem_read_byte(gb, gb->pc++);
     gb->hl = gb->sp + offset;
     gb->f = 0x00;
 
@@ -1507,6 +1507,10 @@ static void scf(struct gb_s *gb)
 static void stop(struct gb_s *gb)
 {
     // TODO: Extend behavior?
+
+    // The DIV register is reset when executing STOP
+    // see https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
+    mem_write_byte(gb, 0xFF00 + GB_DIV, 0x00);
     gb->stopped = true;
 
     gb->m_cycles += 1;
@@ -2565,14 +2569,64 @@ void cpu_handle_interrupts(struct gb_s *gb)
     }
 }
 
+static uint16_t cpu_get_timer_div(struct gb_s *gb)
+{
+    uint8_t tac_clock = mem_read_byte(gb, 0xFF00 + GB_TAC) & 0b11;
+
+    switch (tac_clock)
+    {
+    case 0b00:
+        return 1024;
+
+    case 0b01:
+        return 16;
+
+    case 0b10:
+        return 64;
+
+    case 0b11:
+        return 256;
+
+    default:
+        printf("Unkown timer clock %d\n", tac_clock);
+        assert(!"Unkown timer clock");
+        return 0;
+    }
+}
+
 void cpu_handle_timers(struct gb_s *gb, uint16_t cycles)
 {
     static uint16_t div_cycles;
+    static uint16_t timer_cycles;
 
     div_cycles += cycles;
-    if (div_cycles >= 256)
+    if (div_cycles >= (GB_CLOCK_SPEED_HZ / 16384))
     {
         div_cycles = 0;
+        // Use direct memory write instead of mem_write_byte() because
+        // writing any value to DIV must reset it - which is not what we want here
+        gb->memory.ram[0xFF00 + GB_DIV - 0x8000]++;
+    }
+
+    if (mem_read_byte(gb, 0xFF00 + GB_TAC) & (1 << 2)) // TAC bit 2 enables the timer
+    {
+        uint16_t timer_divider = cpu_get_timer_div(gb);
+        timer_cycles += cycles;
+
+        if (timer_cycles >= (GB_CLOCK_SPEED_HZ / timer_divider))
+        {
+            uint8_t timer_counter = mem_read_byte(gb, 0xFF00 + GB_TIMA);
+            mem_write_byte(gb, 0xFF00 + GB_TIMA, timer_counter + 1);
+
+            if (timer_counter == 0xFF)
+            {
+                // TODO:
+                // reset to TMA
+                // raise interrupt
+
+                // TODO: implement obscure timer behavior
+            }
+        }
     }
 }
 
