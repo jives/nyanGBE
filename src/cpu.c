@@ -555,10 +555,9 @@ static void inc_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, value + 1);
-    gb->f &= ~(z | h);
-    gb->f |= n;
+    gb->f &= ~(z | h | n);
 
-    if (value + 1 == 0)
+    if (((value + 1) & 0xFF) == 0)
     {
         gb->f |= z;
     }
@@ -796,7 +795,7 @@ static void bit_u3_r8(struct gb_s *gb, uint8_t opcode)
 
     if (!(value & (1 << bit)))
     {
-        gb->f |= c;
+        gb->f |= z;
     }
 
     gb->m_cycles += 2;
@@ -842,8 +841,14 @@ static void swap_r8(struct gb_s *gb, uint8_t opcode)
 {
     uint8_t dst = regmap(opcode & 0b111);
     uint8_t value = gb->registers[dst];
+    gb->f = 0x00;
 
     gb->registers[dst] = ((value >> 4) & 0x0F) | ((value << 4) & 0xF0);
+
+    if (gb->registers[dst] == 0)
+    {
+        gb->f |= z;
+    }
 
     gb->m_cycles += 2;
 }
@@ -852,12 +857,18 @@ static void swap_hli(struct gb_s *gb)
 {
     uint8_t value = mem_read_byte(gb, gb->hl);
     mem_write_byte(gb, gb->hl, ((value >> 4) & 0x0F) | ((value << 4) & 0xF0));
+    gb->f = 0x00;
+
+    if (value == 0)
+    {
+        gb->f |= z;
+    }
 
     gb->m_cycles += 4;
 }
 
 // Bit Shift Instructions (OxCB prefixed)
-static void rl_r8(struct gb_s *gb, uint8_t opcode)
+static void rl_r8(struct gb_s *gb, uint8_t opcode, bool handle_zero_flag)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -872,19 +883,20 @@ static void rl_r8(struct gb_s *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (opcode == OP_RLA)
+    if (handle_zero_flag)
     {
-        gb->m_cycles += 1;
-    }
-    else
-    {
-        // RLA does not set the zero flag
+
         if (gb->registers[src] == 0)
         {
             gb->f |= z;
         }
 
         gb->m_cycles += 2;
+    }
+    else
+    {
+        // RLA does not set the zero flag
+        gb->m_cycles += 1;
     }
 }
 
@@ -911,7 +923,7 @@ static void rl_hli(struct gb_s *gb)
     gb->m_cycles += 4;
 }
 
-static void rlc_r8(struct gb_s *gb, uint8_t opcode)
+static void rlc_r8(struct gb_s *gb, uint8_t opcode, bool handle_zero_flag)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -925,19 +937,20 @@ static void rlc_r8(struct gb_s *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (opcode == OP_RLCA)
+    if (handle_zero_flag)
     {
-        gb->m_cycles += 1;
-    }
-    else
-    {
-        // RLCA does not set the zero flag
+
         if (gb->registers[src] == 0)
         {
             gb->f |= z;
         }
 
         gb->m_cycles += 2;
+    }
+    else
+    {
+        // RLCA does not set the zero flag
+        gb->m_cycles += 1;
     }
 }
 
@@ -963,7 +976,7 @@ static void rlc_hli(struct gb_s *gb)
     gb->m_cycles += 4;
 }
 
-static void rr_r8(struct gb_s *gb, uint8_t opcode)
+static void rr_r8(struct gb_s *gb, uint8_t opcode, bool handle_zero_flag)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -978,18 +991,20 @@ static void rr_r8(struct gb_s *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (opcode == OP_RRA)
+    if (handle_zero_flag)
     {
-        gb->m_cycles += 1;
-    }
-    else
-    {
-        // RRA does not set the zero flag
+
         if (gb->registers[src] == 0)
         {
             gb->f |= z;
         }
+
         gb->m_cycles += 2;
+    }
+    else
+    {
+        // RRA does not set the zero flag
+        gb->m_cycles += 1;
     }
 }
 
@@ -1016,7 +1031,7 @@ static void rr_hli(struct gb_s *gb)
     gb->m_cycles += 4;
 }
 
-static void rrc_r8(struct gb_s *gb, uint8_t opcode)
+static void rrc_r8(struct gb_s *gb, uint8_t opcode, bool handle_zero_flag)
 {
     uint8_t src = regmap(opcode & 0b111);
     uint8_t value = gb->registers[src];
@@ -1030,18 +1045,20 @@ static void rrc_r8(struct gb_s *gb, uint8_t opcode)
         gb->f |= c;
     }
 
-    if (opcode == OP_RRCA)
+    if (handle_zero_flag)
     {
-        gb->m_cycles += 1;
-    }
-    else
-    {
-        // RRCA does not set the zero flag
+
         if (gb->registers[src] == 0)
         {
             gb->f |= z;
         }
+
         gb->m_cycles += 2;
+    }
+    else
+    {
+        // RRCA does not set the zero flag
+        gb->m_cycles += 1;
     }
 }
 
@@ -1908,25 +1925,25 @@ static void execute_opcode(struct gb_s *gb, uint8_t opcode)
 
     case OP_RLCA:
     {
-        rlc_r8(gb, opcode);
+        rlc_r8(gb, opcode, false);
         break;
     }
 
     case OP_RRCA:
     {
-        rrc_r8(gb, opcode);
+        rrc_r8(gb, opcode, false);
         break;
     }
 
     case OP_RLA:
     {
-        rl_r8(gb, opcode);
+        rl_r8(gb, opcode, false);
         break;
     }
 
     case OP_RRA:
     {
-        rr_r8(gb, opcode);
+        rr_r8(gb, opcode, false);
         break;
     }
 
@@ -2377,7 +2394,7 @@ static void execute_cb_opcode(struct gb_s *gb, uint8_t opcode)
     case OP_RL_H:
     case OP_RL_L:
     {
-        rl_r8(gb, opcode);
+        rl_r8(gb, opcode, true);
         break;
     }
 
@@ -2395,7 +2412,7 @@ static void execute_cb_opcode(struct gb_s *gb, uint8_t opcode)
     case OP_RLC_H:
     case OP_RLC_L:
     {
-        rlc_r8(gb, opcode);
+        rlc_r8(gb, opcode, true);
         break;
     }
 
@@ -2413,7 +2430,7 @@ static void execute_cb_opcode(struct gb_s *gb, uint8_t opcode)
     case OP_RR_H:
     case OP_RR_L:
     {
-        rr_r8(gb, opcode);
+        rr_r8(gb, opcode, true);
         break;
     }
 
@@ -2431,7 +2448,7 @@ static void execute_cb_opcode(struct gb_s *gb, uint8_t opcode)
     case OP_RRC_H:
     case OP_RRC_L:
     {
-        rrc_r8(gb, opcode);
+        rrc_r8(gb, opcode, true);
         break;
     }
 
