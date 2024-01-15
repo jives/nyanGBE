@@ -8,6 +8,7 @@
 #define GB_NUM_REG_8_BIT 8
 #define GB_NUM_REG_16_BIT 6
 #define GB_CLOCK_SPEED_HZ 4194304
+#define GB_DIV_CYCLES GB_CLOCK_SPEED_HZ / 16384
 
 /* Flags */
 typedef enum __attribute__((packed)) flags

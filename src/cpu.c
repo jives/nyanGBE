@@ -5,6 +5,7 @@
 #include "cpu.h"
 #include "memory.h"
 #include "opcodes.h"
+#include "timer.h"
 
 /**
  * @brief Maps optable register number to array register index
@@ -393,8 +394,8 @@ static void addc_a_d8(struct gb_s *gb, uint8_t opcode)
 
 static void add_sp_i8(struct gb_s *gb)
 {
-    int8_t value = mem_read_byte(gb, gb->pc++);
-    uint8_t sp = gb->sp;
+    int16_t value = (int8_t)mem_read_byte(gb, gb->pc++);
+    uint16_t sp = gb->sp;
     gb->sp += value;
     gb->f = 0x00;
 
@@ -403,7 +404,7 @@ static void add_sp_i8(struct gb_s *gb)
         gb->f |= h;
     }
 
-    if (((uint16_t)sp) + value > 0xFF)
+    if ((sp & 0xFF) + (value & 0xFF) > 0xFF)
     {
         gb->f |= c;
     }
@@ -2524,110 +2525,63 @@ static void cpu_isr(struct gb_s *gb, uint16_t addr)
     gb->m_cycles += 3;
 }
 
-void cpu_handle_interrupts(struct gb_s *gb)
+static void cpu_handle_interrupts(struct gb_s *gb)
 {
+    uint16_t if_addr = 0xFF00 + GB_IF;
+    uint8_t ir_enable = mem_read_byte(gb, 0xFF00 + GB_IE);
+    uint8_t ir_flags = mem_read_byte(gb, if_addr);
+    uint8_t ir_status = ir_enable & ir_flags;
+
+    if (ir_status && gb->halted)
+    {
+        printf("Wake up from HALT (IR: %02X, cycles: %d)\n", ir_status, gb->m_cycles);
+        gb->halted = false;
+    }
+
     if (gb->ime)
     {
-        uint8_t ir_enable = mem_read_byte(gb, 0xFF00 + GB_IE);
-        uint8_t ir_flags = mem_read_byte(gb, 0xFF00 + GB_IF);
-        uint8_t ir_status = ir_enable & ir_flags;
-
         if ((ir_status & IR_VBLANK))
         {
-            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_VBLANK);
+            mem_write_byte(gb, if_addr, ir_flags ^ IR_VBLANK);
             cpu_isr(gb, 0x40);
             return;
         }
 
         if ((ir_status & IR_LCD))
         {
-            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_LCD);
+            mem_write_byte(gb, if_addr, ir_flags ^ IR_LCD);
             cpu_isr(gb, 0x48);
             return;
         }
 
         if ((ir_status & IR_TIMER))
         {
-            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_TIMER);
+            mem_write_byte(gb, if_addr, ir_flags ^ IR_TIMER);
             cpu_isr(gb, 0x50);
             return;
         }
 
         if ((ir_status & IR_SERIAL))
         {
-            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_SERIAL);
+            mem_write_byte(gb, if_addr, ir_flags ^ IR_SERIAL);
             cpu_isr(gb, 0x58);
             return;
         }
 
         if ((ir_status & IR_JOYPAD))
         {
-            mem_write_byte(gb, 0xFF00 + GB_IF, ir_flags ^ IR_JOYPAD);
+            mem_write_byte(gb, if_addr, ir_flags ^ IR_JOYPAD);
             cpu_isr(gb, 0x60);
             return;
         }
     }
 }
 
-static uint16_t cpu_get_timer_div(struct gb_s *gb)
+void cpu_raise_interrupt(struct gb_s *gb, interrupts_t ir)
 {
-    uint8_t tac_clock = mem_read_byte(gb, 0xFF00 + GB_TAC) & 0b11;
-
-    switch (tac_clock)
-    {
-    case 0b00:
-        return 1024;
-
-    case 0b01:
-        return 16;
-
-    case 0b10:
-        return 64;
-
-    case 0b11:
-        return 256;
-
-    default:
-        printf("Unkown timer clock %d\n", tac_clock);
-        assert(!"Unkown timer clock");
-        return 0;
-    }
-}
-
-void cpu_handle_timers(struct gb_s *gb, uint16_t cycles)
-{
-    static uint16_t div_cycles;
-    static uint16_t timer_cycles;
-
-    div_cycles += cycles;
-    if (div_cycles >= (GB_CLOCK_SPEED_HZ / 16384))
-    {
-        div_cycles = 0;
-        // Use direct memory write instead of mem_write_byte() because
-        // writing any value to DIV must reset it - which is not what we want here
-        gb->memory.ram[0xFF00 + GB_DIV - 0x8000]++;
-    }
-
-    if (mem_read_byte(gb, 0xFF00 + GB_TAC) & (1 << 2)) // TAC bit 2 enables the timer
-    {
-        uint16_t timer_divider = cpu_get_timer_div(gb);
-        timer_cycles += cycles;
-
-        if (timer_cycles >= (GB_CLOCK_SPEED_HZ / timer_divider))
-        {
-            uint8_t timer_counter = mem_read_byte(gb, 0xFF00 + GB_TIMA);
-            mem_write_byte(gb, 0xFF00 + GB_TIMA, timer_counter + 1);
-
-            if (timer_counter == 0xFF)
-            {
-                // TODO:
-                // reset to TMA
-                // raise interrupt
-
-                // TODO: implement obscure timer behavior
-            }
-        }
-    }
+    uint16_t addr = 0xFF00 + GB_IF;
+    uint8_t ir_flags = mem_read_byte(gb, addr);
+    mem_write_byte(gb, addr, ir_flags | ir);
 }
 
 /**
@@ -2641,6 +2595,7 @@ void cpu_run(struct gb_s *gb)
 
     if (gb->stopped)
     {
+        // TODO: Check if this is really it
         return;
     }
 
@@ -2666,10 +2621,13 @@ void cpu_run(struct gb_s *gb)
         {
             execute_opcode(gb, opcode);
         }
-
-        uint16_t cycles_passed = gb->m_cycles - current_cycles;
-
-        cpu_handle_timers(gb, cycles_passed);
-        cpu_handle_interrupts(gb);
     }
+    else
+    {
+        gb->m_cycles++;
+    }
+
+    uint16_t cycles_passed = gb->m_cycles - current_cycles;
+    timer_run(gb, cycles_passed);
+    cpu_handle_interrupts(gb);
 }
