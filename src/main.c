@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     if (gb_load_rom(&gb, rom_path) != 0)
         return EXIT_FAILURE;
 
-    FILE *log_file = fopen("gb.log", "w");
+    FILE *log_file = fopen("nyanGB-instr.log", "w");
 
     signal(SIGINT, sig_handler);
     while (keep_running)
