@@ -1,5 +1,7 @@
 # Environment
 .vscode/
+build/
+bin/
 
 # Prerequisites
 *.d
