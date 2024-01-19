@@ -42,7 +42,7 @@ int gb_load_rom(struct gb_s *gb, const char *path)
 
     if (rom_size > 0x8000)
     {
-        printf("ROM too large: %d.\n", rom_size);
+        printf("ROM too large: %ld.\n", rom_size);
         return -1;
     }
 
