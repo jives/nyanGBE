@@ -46,7 +46,7 @@ void mem_write_byte(struct gb_s *gb, uint16_t loc, uint8_t data)
         // Protect ROM from writes
         return;
 
-    if (loc == (0xFF00 + GB_DIV))
+    if (loc == GB_DIV)
     {
         // When writing any value to DIV, DIV is reset
         data = 0x00;

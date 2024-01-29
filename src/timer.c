@@ -7,7 +7,7 @@
 
 static uint16_t timer_get_divider(struct gb_s *gb)
 {
-    uint8_t tac_clock = mem_read_byte(gb, 0xFF00 + GB_TAC) & 0b11;
+    uint8_t tac_clock = mem_read_byte(gb, GB_TAC) & 0b11;
 
     switch (tac_clock)
     {
@@ -46,10 +46,10 @@ void timer_run(struct gb_s *gb, uint16_t m_cycles)
 
         // Use direct memory write instead of mem_write_byte() because
         // writing any value to DIV must reset it - which is not what we want here
-        gb->memory.ram[0xFF00 + GB_DIV - 0x8000]++;
+        gb->memory.ram[GB_DIV - 0x8000]++;
     }
 
-    if (mem_read_byte(gb, 0xFF00 + GB_TAC) & (1 << 2)) // TAC bit 2 enables the timer
+    if (mem_read_byte(gb, GB_TAC) & (1 << 2)) // TAC bit 2 enables the timer
     {
         uint16_t timer_target = timer_get_divider(gb);
         timer_cycles += t_cycles;
@@ -59,13 +59,13 @@ void timer_run(struct gb_s *gb, uint16_t m_cycles)
             // See comment for DIV above as to why we're not resetting to 0
             timer_cycles -= timer_target;
 
-            uint8_t timer_counter = mem_read_byte(gb, 0xFF00 + GB_TIMA);
-            mem_write_byte(gb, 0xFF00 + GB_TIMA, timer_counter + 1);
+            uint8_t timer_counter = mem_read_byte(gb, GB_TIMA);
+            mem_write_byte(gb, GB_TIMA, timer_counter + 1);
 
             if (timer_counter == 0xFF)
             {
-                uint8_t timer_modulo = mem_read_byte(gb, 0xFF00 + GB_TMA);
-                mem_write_byte(gb, 0xFF00 + GB_TIMA, timer_modulo);
+                uint8_t timer_modulo = mem_read_byte(gb, GB_TMA);
+                mem_write_byte(gb, GB_TIMA, timer_modulo);
                 cpu_raise_interrupt(gb, IR_TIMER);
 
                 // TODO: implement obscure timer behavior

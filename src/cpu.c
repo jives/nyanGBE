@@ -1528,7 +1528,7 @@ static void stop(struct gb_s *gb)
 
     // The DIV register is reset when executing STOP
     // see https://gbdev.io/pandocs/Timer_and_Divider_Registers.html
-    mem_write_byte(gb, 0xFF00 + GB_DIV, 0x00);
+    mem_write_byte(gb, GB_DIV, 0x00);
     gb->stopped = true;
 
     gb->m_cycles += 1;
@@ -2544,9 +2544,8 @@ static void cpu_isr(struct gb_s *gb, uint16_t addr)
 
 static void cpu_handle_interrupts(struct gb_s *gb)
 {
-    uint16_t if_addr = 0xFF00 + GB_IF;
-    uint8_t ir_enable = mem_read_byte(gb, 0xFF00 + GB_IE);
-    uint8_t ir_flags = mem_read_byte(gb, if_addr);
+    uint8_t ir_enable = mem_read_byte(gb, GB_IE);
+    uint8_t ir_flags = mem_read_byte(gb, GB_IF);
     uint8_t ir_status = ir_enable & ir_flags;
 
     if (ir_status && gb->halted)
@@ -2559,35 +2558,35 @@ static void cpu_handle_interrupts(struct gb_s *gb)
     {
         if ((ir_status & IR_VBLANK))
         {
-            mem_write_byte(gb, if_addr, ir_flags ^ IR_VBLANK);
+            mem_write_byte(gb, GB_IF, ir_flags ^ IR_VBLANK);
             cpu_isr(gb, 0x40);
             return;
         }
 
         if ((ir_status & IR_LCD))
         {
-            mem_write_byte(gb, if_addr, ir_flags ^ IR_LCD);
+            mem_write_byte(gb, GB_IF, ir_flags ^ IR_LCD);
             cpu_isr(gb, 0x48);
             return;
         }
 
         if ((ir_status & IR_TIMER))
         {
-            mem_write_byte(gb, if_addr, ir_flags ^ IR_TIMER);
+            mem_write_byte(gb, GB_IF, ir_flags ^ IR_TIMER);
             cpu_isr(gb, 0x50);
             return;
         }
 
         if ((ir_status & IR_SERIAL))
         {
-            mem_write_byte(gb, if_addr, ir_flags ^ IR_SERIAL);
+            mem_write_byte(gb, GB_IF, ir_flags ^ IR_SERIAL);
             cpu_isr(gb, 0x58);
             return;
         }
 
         if ((ir_status & IR_JOYPAD))
         {
-            mem_write_byte(gb, if_addr, ir_flags ^ IR_JOYPAD);
+            mem_write_byte(gb, GB_IF, ir_flags ^ IR_JOYPAD);
             cpu_isr(gb, 0x60);
             return;
         }
@@ -2596,9 +2595,8 @@ static void cpu_handle_interrupts(struct gb_s *gb)
 
 void cpu_raise_interrupt(struct gb_s *gb, interrupts_t ir)
 {
-    uint16_t addr = 0xFF00 + GB_IF;
-    uint8_t ir_flags = mem_read_byte(gb, addr);
-    mem_write_byte(gb, addr, ir_flags | ir);
+    uint8_t ir_flags = mem_read_byte(gb, GB_IF);
+    mem_write_byte(gb, GB_IF, ir_flags | ir);
 }
 
 /**
